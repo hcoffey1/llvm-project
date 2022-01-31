@@ -10139,6 +10139,8 @@ public:
   void ActOnPragmaFPExceptions(SourceLocation Loc,
                                LangOptions::FPExceptionModeKind);
 
+  StmtResult ActOnPragmaHC(SourceLocation Loc);
+
   /// Called to set constant rounding mode for floating point operations.
   void setRoundingMode(SourceLocation Loc, llvm::RoundingMode);
 

@@ -1694,6 +1694,12 @@ StmtResult Sema::ActOnWhileStmt(SourceLocation WhileLoc,
                            WhileLoc, LParenLoc, RParenLoc);
 }
 
+StmtResult Sema::ActOnPragmaHC(SourceLocation Loc)
+{
+  return new (Context) HCStmt(Loc);
+}
+
+
 StmtResult
 Sema::ActOnDoStmt(SourceLocation DoLoc, Stmt *Body,
                   SourceLocation WhileLoc, SourceLocation CondLParen,

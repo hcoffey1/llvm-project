@@ -438,6 +438,10 @@ Retry:
   case tok::annot_pragma_attribute:
     HandlePragmaAttribute();
     return StmtEmpty();
+
+  case tok::annot_pragma_hc_handle:
+    ProhibitAttributes(Attrs);
+    return HandlePragmaHC();
   }
 
   // If we reached this code, the statement must end in a semicolon.

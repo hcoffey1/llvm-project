@@ -266,6 +266,17 @@ ASM_SYMBOL(__xray_CustomEvent):
 	CFI_STARTPROC
 	SAVE_REGISTERS
 
+	//mov %rax, 1
+	//mov %rdi, %rax 
+	//syscall
+	//msg db 'Hello, world!',0xa
+	//len equ $ - msg
+	//mov edx,len
+	//mov ecx,msg
+	//mov ebx,1
+	//mov eax,4
+	//int 0x80
+
 	// We take two arguments to this trampoline, which should be in rdi	and rsi
 	// already.
 	movq ASM_SYMBOL(_ZN6__xray22XRayPatchedCustomEventE)(%rip), %rax

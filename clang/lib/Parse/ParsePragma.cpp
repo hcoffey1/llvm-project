@@ -239,6 +239,12 @@ struct PragmaLoopHintHandler : public PragmaHandler {
                     Token &FirstToken) override;
 };
 
+struct PragmaHCHandler : public PragmaHandler {
+  PragmaHCHandler(const char *name) : PragmaHandler(name) {}
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override;
+};
+
 struct PragmaUnrollHintHandler : public PragmaHandler {
   PragmaUnrollHintHandler(const char *name) : PragmaHandler(name) {}
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
@@ -466,6 +472,10 @@ void Parser::initializePragmaHandlers() {
 
   LoopHintHandler = std::make_unique<PragmaLoopHintHandler>();
   PP.AddPragmaHandler("clang", LoopHintHandler.get());
+
+  HCHandler = std::make_unique<PragmaHCHandler>("hc_instrument");
+  PP.AddPragmaHandler(HCHandler.get());
+  PP.AddPragmaHandler("GCC", HCHandler.get());
 
   UnrollHintHandler = std::make_unique<PragmaUnrollHintHandler>("unroll");
   PP.AddPragmaHandler(UnrollHintHandler.get());
@@ -3388,6 +3398,37 @@ void PragmaLoopHintHandler::HandlePragma(Preprocessor &PP,
 
   PP.EnterTokenStream(std::move(TokenArray), TokenList.size(),
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
+}
+
+///Testing pragma implementation HC
+void PragmaHCHandler::HandlePragma(Preprocessor &PP,
+                                   PragmaIntroducer Introducer,
+                                   Token &Tok){
+  Token tmpTok;
+  while(tmpTok.isNot(tok::eod))
+  {
+    PP.Lex(tmpTok);
+  }
+
+  tmpTok.startToken();
+  tmpTok.setKind(tok::annot_pragma_hc_handle);
+  tmpTok.setLocation(Tok.getLocation());
+  tmpTok.setAnnotationEndLoc(Tok.getLocation());
+
+  PP.EnterToken(tmpTok, false);
+}
+
+StmtResult Parser::HandlePragmaHC()
+{
+  assert(Tok.is(tok::annot_pragma_hc_handle));
+
+  while (Tok.is(tok::annot_pragma_hc_handle)){
+    ConsumeToken(); // The argument token.
+  }
+
+  //return Actions.ActOnPragmaHC(Tok.getLocation());
+
+  return StmtEmpty();
 }
 
 /// Handle the loop unroll optimization pragmas.

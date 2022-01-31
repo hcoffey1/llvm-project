@@ -2479,6 +2479,22 @@ public:
   }
 };
 
+/// HCStmt - Test statement
+class HCStmt : public Stmt {
+  SourceLocation loc;
+
+  public:
+    HCStmt(SourceLocation _loc)
+    : Stmt(DoStmtClass)
+    {
+      loc = _loc;
+    }
+
+    SourceLocation getBeginLoc() const { return loc; }
+    SourceLocation getEndLoc() const { return loc; }
+
+};
+
 /// DoStmt - This represents a 'do/while' stmt.
 class DoStmt : public Stmt {
   enum { BODY, COND, END_EXPR };
