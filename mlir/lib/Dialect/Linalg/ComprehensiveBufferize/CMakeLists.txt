@@ -1,41 +1,38 @@
 set(LLVM_OPTIONAL_SOURCES
-  BufferizableOpInterface.cpp
-  ComprehensiveBufferize.cpp
+  AffineInterfaceImpl.cpp
   LinalgInterfaceImpl.cpp
+  ModuleBufferization.cpp
+  StdInterfaceImpl.cpp
+  VectorInterfaceImpl.cpp
 )
 
-add_mlir_dialect_library(MLIRBufferizableOpInterface
-  BufferizableOpInterface.cpp
-
-  DEPENDS
-  MLIRBufferizableOpInterfaceIncGen
+add_mlir_dialect_library(MLIRAffineBufferizableOpInterfaceImpl
+  AffineInterfaceImpl.cpp
 
   LINK_LIBS PUBLIC
-  MLIRIR
+  MLIRAffine
+  MLIRBufferization
 )
 
 add_mlir_dialect_library(MLIRLinalgBufferizableOpInterfaceImpl
   LinalgInterfaceImpl.cpp
 
   LINK_LIBS PUBLIC
-  MLIRBufferizableOpInterface
+  MLIRBufferization
+  MLIRBufferizationTransforms
   MLIRIR
   MLIRLinalg
   MLIRTensor
 )
 
-add_mlir_dialect_library(MLIRComprehensiveBufferize
-  ComprehensiveBufferize.cpp
+add_mlir_dialect_library(MLIRModuleBufferization
+  ModuleBufferization.cpp
 
   LINK_LIBS PUBLIC
-  MLIRAffine
-  MLIRBufferizableOpInterface
-  MLIRInferTypeOpInterface
+  MLIRBufferization
+  MLIRBufferizationTransforms
   MLIRIR
   MLIRMemRef
-  MLIRSCF
   MLIRStandard
   MLIRStandardOpsTransforms
-  MLIRTensor
-  MLIRVector
 )

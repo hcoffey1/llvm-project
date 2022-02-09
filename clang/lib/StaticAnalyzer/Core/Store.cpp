@@ -249,7 +249,7 @@ static bool regionMatchesCXXRecordType(SVal V, QualType Ty) {
 }
 
 SVal StoreManager::evalDerivedToBase(SVal Derived, const CastExpr *Cast) {
-  // Sanity check to avoid doing the wrong thing in the face of
+  // Early return to avoid doing the wrong thing in the face of
   // reinterpret_cast.
   if (!regionMatchesCXXRecordType(Derived, Cast->getSubExpr()->getType()))
     return UnknownVal();
@@ -314,10 +314,7 @@ static const CXXRecordDecl *getCXXRecordType(const MemRegion *MR) {
   return nullptr;
 }
 
-SVal StoreManager::attemptDownCast(SVal Base, QualType TargetType,
-                                   bool &Failed) {
-  Failed = false;
-
+Optional<SVal> StoreManager::evalBaseToDerived(SVal Base, QualType TargetType) {
   const MemRegion *MR = Base.getAsRegion();
   if (!MR)
     return UnknownVal();
@@ -392,7 +389,9 @@ SVal StoreManager::attemptDownCast(SVal Base, QualType TargetType,
   }
 
   // We failed if the region we ended up with has perfect type info.
-  Failed = isa<TypedValueRegion>(MR);
+  if (isa<TypedValueRegion>(MR))
+    return None;
+
   return UnknownVal();
 }
 

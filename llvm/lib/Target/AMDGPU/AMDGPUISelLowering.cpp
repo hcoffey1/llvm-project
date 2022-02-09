@@ -51,7 +51,7 @@ unsigned AMDGPUTargetLowering::numBitsUnsigned(SDValue Op, SelectionDAG &DAG) {
 unsigned AMDGPUTargetLowering::numBitsSigned(SDValue Op, SelectionDAG &DAG) {
   // In order for this to be a signed 24-bit value, bit 23, must
   // be a sign bit.
-  return DAG.ComputeMinSignedBits(Op);
+  return DAG.ComputeMaxSignificantBits(Op);
 }
 
 AMDGPUTargetLowering::AMDGPUTargetLowering(const TargetMachine &TM,
@@ -360,6 +360,8 @@ AMDGPUTargetLowering::AMDGPUTargetLowering(const TargetMachine &TM,
   setOperationAction(ISD::CONCAT_VECTORS, MVT::v8f32, Custom);
   setOperationAction(ISD::EXTRACT_SUBVECTOR, MVT::v2f16, Custom);
   setOperationAction(ISD::EXTRACT_SUBVECTOR, MVT::v2i16, Custom);
+  setOperationAction(ISD::EXTRACT_SUBVECTOR, MVT::v4f16, Custom);
+  setOperationAction(ISD::EXTRACT_SUBVECTOR, MVT::v4i16, Custom);
   setOperationAction(ISD::EXTRACT_SUBVECTOR, MVT::v2f32, Custom);
   setOperationAction(ISD::EXTRACT_SUBVECTOR, MVT::v2i32, Custom);
   setOperationAction(ISD::EXTRACT_SUBVECTOR, MVT::v3f32, Custom);
@@ -594,6 +596,8 @@ AMDGPUTargetLowering::AMDGPUTargetLowering(const TargetMachine &TM,
   setTargetDAGCombine(ISD::SRL);
   setTargetDAGCombine(ISD::TRUNCATE);
   setTargetDAGCombine(ISD::MUL);
+  setTargetDAGCombine(ISD::SMUL_LOHI);
+  setTargetDAGCombine(ISD::UMUL_LOHI);
   setTargetDAGCombine(ISD::MULHU);
   setTargetDAGCombine(ISD::MULHS);
   setTargetDAGCombine(ISD::SELECT);
@@ -1404,6 +1408,11 @@ SDValue AMDGPUTargetLowering::LowerEXTRACT_SUBVECTOR(SDValue Op,
   if (((SrcVT == MVT::v4f16 && VT == MVT::v2f16) ||
        (SrcVT == MVT::v4i16 && VT == MVT::v2i16)) &&
       Start != 1)
+    return Op;
+
+  if (((SrcVT == MVT::v8f16 && VT == MVT::v4f16) ||
+       (SrcVT == MVT::v8i16 && VT == MVT::v4i16)) &&
+      (Start == 0 || Start == 4))
     return Op;
 
   DAG.ExtractVectorElements(Op.getOperand(0), Args, Start,
@@ -3272,8 +3281,9 @@ SDValue AMDGPUTargetLowering::performSrlCombine(SDNode *N,
   // this improves the ability to match BFE patterns in isel.
   if (LHS.getOpcode() == ISD::AND) {
     if (auto *Mask = dyn_cast<ConstantSDNode>(LHS.getOperand(1))) {
-      if (Mask->getAPIntValue().isShiftedMask() &&
-          Mask->getAPIntValue().countTrailingZeros() == ShiftAmt) {
+      unsigned MaskIdx, MaskLen;
+      if (Mask->getAPIntValue().isShiftedMask(MaskIdx, MaskLen) &&
+          MaskIdx == ShiftAmt) {
         return DAG.getNode(
             ISD::AND, SL, VT,
             DAG.getNode(ISD::SRL, SL, VT, LHS.getOperand(0), N->getOperand(1)),
@@ -3460,6 +3470,50 @@ SDValue AMDGPUTargetLowering::performMulCombine(SDNode *N,
   // We need to use sext even for MUL_U24, because MUL_U24 is used
   // for signed multiply of 8 and 16-bit types.
   return DAG.getSExtOrTrunc(Mul, DL, VT);
+}
+
+SDValue
+AMDGPUTargetLowering::performMulLoHiCombine(SDNode *N,
+                                            DAGCombinerInfo &DCI) const {
+  if (N->getValueType(0) != MVT::i32)
+    return SDValue();
+
+  SelectionDAG &DAG = DCI.DAG;
+  SDLoc DL(N);
+
+  SDValue N0 = N->getOperand(0);
+  SDValue N1 = N->getOperand(1);
+
+  // SimplifyDemandedBits has the annoying habit of turning useful zero_extends
+  // in the source into any_extends if the result of the mul is truncated. Since
+  // we can assume the high bits are whatever we want, use the underlying value
+  // to avoid the unknown high bits from interfering.
+  if (N0.getOpcode() == ISD::ANY_EXTEND)
+    N0 = N0.getOperand(0);
+  if (N1.getOpcode() == ISD::ANY_EXTEND)
+    N1 = N1.getOperand(0);
+
+  // Try to use two fast 24-bit multiplies (one for each half of the result)
+  // instead of one slow extending multiply.
+  unsigned LoOpcode, HiOpcode;
+  if (Subtarget->hasMulU24() && isU24(N0, DAG) && isU24(N1, DAG)) {
+    N0 = DAG.getZExtOrTrunc(N0, DL, MVT::i32);
+    N1 = DAG.getZExtOrTrunc(N1, DL, MVT::i32);
+    LoOpcode = AMDGPUISD::MUL_U24;
+    HiOpcode = AMDGPUISD::MULHI_U24;
+  } else if (Subtarget->hasMulI24() && isI24(N0, DAG) && isI24(N1, DAG)) {
+    N0 = DAG.getSExtOrTrunc(N0, DL, MVT::i32);
+    N1 = DAG.getSExtOrTrunc(N1, DL, MVT::i32);
+    LoOpcode = AMDGPUISD::MUL_I24;
+    HiOpcode = AMDGPUISD::MULHI_I24;
+  } else {
+    return SDValue();
+  }
+
+  SDValue Lo = DAG.getNode(LoOpcode, DL, MVT::i32, N0, N1);
+  SDValue Hi = DAG.getNode(HiOpcode, DL, MVT::i32, N0, N1);
+  DCI.CombineTo(N, Lo, Hi);
+  return SDValue(N, 0);
 }
 
 SDValue AMDGPUTargetLowering::performMulhsCombine(SDNode *N,
@@ -4103,6 +4157,9 @@ SDValue AMDGPUTargetLowering::PerformDAGCombine(SDNode *N,
     return performTruncateCombine(N, DCI);
   case ISD::MUL:
     return performMulCombine(N, DCI);
+  case ISD::SMUL_LOHI:
+  case ISD::UMUL_LOHI:
+    return performMulLoHiCombine(N, DCI);
   case ISD::MULHS:
     return performMulhsCombine(N, DCI);
   case ISD::MULHU:
@@ -4577,11 +4634,12 @@ void AMDGPUTargetLowering::computeKnownBitsForTargetNode(
     RHSKnown = RHSKnown.trunc(24);
 
     if (Opc == AMDGPUISD::MUL_I24) {
-      unsigned LHSValBits = 24 - LHSKnown.countMinSignBits();
-      unsigned RHSValBits = 24 - RHSKnown.countMinSignBits();
-      unsigned MaxValBits = std::min(LHSValBits + RHSValBits, 32u);
-      if (MaxValBits >= 32)
+      unsigned LHSValBits = LHSKnown.countMaxSignificantBits();
+      unsigned RHSValBits = RHSKnown.countMaxSignificantBits();
+      unsigned MaxValBits = LHSValBits + RHSValBits;
+      if (MaxValBits > 32)
         break;
+      unsigned SignBits = 32 - MaxValBits + 1;
       bool LHSNegative = LHSKnown.isNegative();
       bool LHSNonNegative = LHSKnown.isNonNegative();
       bool LHSPositive = LHSKnown.isStrictlyPositive();
@@ -4590,16 +4648,16 @@ void AMDGPUTargetLowering::computeKnownBitsForTargetNode(
       bool RHSPositive = RHSKnown.isStrictlyPositive();
 
       if ((LHSNonNegative && RHSNonNegative) || (LHSNegative && RHSNegative))
-        Known.Zero.setHighBits(32 - MaxValBits);
+        Known.Zero.setHighBits(SignBits);
       else if ((LHSNegative && RHSPositive) || (LHSPositive && RHSNegative))
-        Known.One.setHighBits(32 - MaxValBits);
+        Known.One.setHighBits(SignBits);
     } else {
-      unsigned LHSValBits = 24 - LHSKnown.countMinLeadingZeros();
-      unsigned RHSValBits = 24 - RHSKnown.countMinLeadingZeros();
-      unsigned MaxValBits = std::min(LHSValBits + RHSValBits, 32u);
+      unsigned LHSValBits = LHSKnown.countMaxActiveBits();
+      unsigned RHSValBits = RHSKnown.countMaxActiveBits();
+      unsigned MaxValBits = LHSValBits + RHSValBits;
       if (MaxValBits >= 32)
         break;
-      Known.Zero.setHighBits(32 - MaxValBits);
+      Known.Zero.setBitsFrom(MaxValBits);
     }
     break;
   }
@@ -4855,7 +4913,8 @@ AMDGPUTargetLowering::shouldExpandAtomicRMWInIR(AtomicRMWInst *RMW) const {
   }
 }
 
-bool AMDGPUTargetLowering::isConstantUnsignedBitfieldExtactLegal(
+bool AMDGPUTargetLowering::isConstantUnsignedBitfieldExtractLegal(
     unsigned Opc, LLT Ty1, LLT Ty2) const {
-  return Ty1 == Ty2 && (Ty1 == LLT::scalar(32) || Ty1 == LLT::scalar(64));
+  return (Ty1 == LLT::scalar(32) || Ty1 == LLT::scalar(64)) &&
+         Ty2 == LLT::scalar(32);
 }

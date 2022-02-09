@@ -16,6 +16,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizerOptions.h"
 
 namespace llvm {
@@ -141,7 +142,7 @@ private:
   AsanDtorKind DestructorKind;
 };
 
-// Insert AddressSanitizer (address sanity checking) instrumentation
+// Insert AddressSanitizer (address basic correctness checking) instrumentation
 FunctionPass *createAddressSanitizerFunctionPass(
     bool CompileKernel = false, bool Recover = false,
     bool UseAfterScope = false,

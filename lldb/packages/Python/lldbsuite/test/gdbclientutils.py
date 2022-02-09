@@ -86,6 +86,7 @@ class MockGDBServerResponder:
 
     registerCount = 40
     packetLog = None
+    class RESPONSE_DISCONNECT: pass
 
     def __init__(self):
         self.packetLog = []
@@ -327,7 +328,7 @@ class MockGDBServerResponder:
         return ""
 
     def k(self):
-        return ""
+        return ["W01", self.RESPONSE_DISCONNECT]
 
     """
     Raised when we receive a packet for which there is no default action.
@@ -338,7 +339,7 @@ class MockGDBServerResponder:
         pass
 
 
-class ServerSocket:
+class ServerChannel:
     """
     A wrapper class for TCP or pty-based server.
     """
@@ -365,21 +366,13 @@ class ServerSocket:
         """Send the data to the connected client."""
 
 
-class TCPServerSocket(ServerSocket):
-    def __init__(self):
-        family, type, proto, _, addr = socket.getaddrinfo(
-                "localhost", 0, proto=socket.IPPROTO_TCP)[0]
+class ServerSocket(ServerChannel):
+    def __init__(self, family, type, proto, addr):
         self._server_socket = socket.socket(family, type, proto)
         self._connection = None
 
         self._server_socket.bind(addr)
         self._server_socket.listen(1)
-
-    def get_connect_address(self):
-        return "[{}]:{}".format(*self._server_socket.getsockname())
-
-    def get_connect_url(self):
-        return "connect://" + self.get_connect_address()
 
     def close_server(self):
         self._server_socket.close()
@@ -409,7 +402,31 @@ class TCPServerSocket(ServerSocket):
         return self._connection.sendall(data)
 
 
-class PtyServerSocket(ServerSocket):
+class TCPServerSocket(ServerSocket):
+    def __init__(self):
+        family, type, proto, _, addr = socket.getaddrinfo(
+                "localhost", 0, proto=socket.IPPROTO_TCP)[0]
+        super().__init__(family, type, proto, addr)
+
+    def get_connect_address(self):
+        return "[{}]:{}".format(*self._server_socket.getsockname())
+
+    def get_connect_url(self):
+        return "connect://" + self.get_connect_address()
+
+
+class UnixServerSocket(ServerSocket):
+    def __init__(self, addr):
+        super().__init__(socket.AF_UNIX, socket.SOCK_STREAM, 0, addr)
+
+    def get_connect_address(self):
+        return self._server_socket.getsockname()
+
+    def get_connect_url(self):
+        return "unix-connect://" + self.get_connect_address()
+
+
+class PtyServerSocket(ServerChannel):
     def __init__(self):
         import pty
         import tty
@@ -460,18 +477,16 @@ class MockGDBServer:
     _receivedDataOffset = None
     _shouldSendAck = True
 
-    def __init__(self, socket_class):
-        self._socket_class = socket_class
+    def __init__(self, socket):
+        self._socket = socket
         self.responder = MockGDBServerResponder()
 
     def start(self):
-        self._socket = self._socket_class()
         # Start a thread that waits for a client connection.
-        self._thread = threading.Thread(target=self._run)
+        self._thread = threading.Thread(target=self.run)
         self._thread.start()
 
     def stop(self):
-        self._socket.close_server()
         self._thread.join()
         self._thread = None
 
@@ -481,28 +496,32 @@ class MockGDBServer:
     def get_connect_url(self):
         return self._socket.get_connect_url()
 
-    def _run(self):
+    def run(self):
         # For testing purposes, we only need to worry about one client
         # connecting just one time.
         try:
             self._socket.accept()
         except:
+            traceback.print_exc()
             return
         self._shouldSendAck = True
         self._receivedData = ""
         self._receivedDataOffset = 0
         data = None
-        while True:
-            try:
+        try:
+            while True:
                 data = seven.bitcast_to_string(self._socket.recv())
                 if data is None or len(data) == 0:
                     break
                 self._receive(data)
-            except Exception as e:
-                print("An exception happened when receiving the response from the gdb server. Closing the client...")
-                traceback.print_exc()
-                self._socket.close_connection()
-                break
+        except self.TerminateConnectionException:
+            pass
+        except Exception as e:
+            print("An exception happened when receiving the response from the gdb server. Closing the client...")
+            traceback.print_exc()
+        finally:
+            self._socket.close_connection()
+            self._socket.close_server()
 
     def _receive(self, data):
         """
@@ -510,13 +529,10 @@ class MockGDBServer:
         Any leftover data is kept for parsing the next time around.
         """
         self._receivedData += data
-        try:
+        packet = self._parsePacket()
+        while packet is not None:
+            self._handlePacket(packet)
             packet = self._parsePacket()
-            while packet is not None:
-                self._handlePacket(packet)
-                packet = self._parsePacket()
-        except self.InvalidPacketException:
-            self._socket.close_connection()
 
     def _parsePacket(self):
         """
@@ -583,6 +599,9 @@ class MockGDBServer:
         self._receivedDataOffset = 0
         return packet
 
+    def _sendPacket(self, packet):
+        self._socket.sendall(seven.bitcast_to_bytes(frame_packet(packet)))
+
     def _handlePacket(self, packet):
         if packet is self.PACKET_ACK:
             # Ignore ACKs from the client. For the future, we can consider
@@ -600,14 +619,18 @@ class MockGDBServer:
         elif self.responder is not None:
             # Delegate everything else to our responder
             response = self.responder.respond(packet)
-        # Handle packet framing since we don't want to bother tests with it.
-        if response is not None:
-            framed = frame_packet(response)
-            self._socket.sendall(seven.bitcast_to_bytes(framed))
+        if not isinstance(response, list):
+            response = [response]
+        for part in response:
+            if part is MockGDBServerResponder.RESPONSE_DISCONNECT:
+                raise self.TerminateConnectionException()
+            self._sendPacket(part)
 
     PACKET_ACK = object()
     PACKET_INTERRUPT = object()
 
-    class InvalidPacketException(Exception):
+    class TerminateConnectionException(Exception):
         pass
 
+    class InvalidPacketException(Exception):
+        pass

@@ -1257,7 +1257,7 @@ StyleKind IdentifierNamingCheck::findStyleKind(
 
   if (const auto *Decl = dyn_cast<CXXMethodDecl>(D)) {
     if (Decl->isMain() || !Decl->isUserProvided() ||
-        Decl->size_overridden_methods() > 0)
+        Decl->size_overridden_methods() > 0 || Decl->hasAttr<OverrideAttr>())
       return SK_Invalid;
 
     // If this method has the same name as any base method, this is likely
@@ -1404,8 +1404,8 @@ IdentifierNamingCheck::getMacroFailureInfo(const Token &MacroNameTok,
   if (!Style.isActive())
     return llvm::None;
 
-  return getFailureInfo("", MacroNameTok.getIdentifierInfo()->getName(), NULL,
-                        Loc, Style.getStyles(), Style.getHNOption(),
+  return getFailureInfo("", MacroNameTok.getIdentifierInfo()->getName(),
+                        nullptr, Loc, Style.getStyles(), Style.getHNOption(),
                         SK_MacroDefinition, SM, IgnoreFailedSplit);
 }
 

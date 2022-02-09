@@ -23,7 +23,6 @@
 
 using namespace clang;
 using namespace ento;
-using llvm::APSInt;
 
 namespace {
 class MmapWriteExecChecker : public Checker<check::PreCall> {
@@ -47,7 +46,7 @@ int MmapWriteExecChecker::ProtRead  = 0x01;
 
 void MmapWriteExecChecker::checkPreCall(const CallEvent &Call,
                                          CheckerContext &C) const {
-  if (Call.isCalled(MmapFn) || Call.isCalled(MprotectFn)) {
+  if (matchesAny(Call, MmapFn, MprotectFn)) {
     SVal ProtVal = Call.getArgSVal(2);
     Optional<nonloc::ConcreteInt> ProtLoc = ProtVal.getAs<nonloc::ConcreteInt>();
     int64_t Prot = ProtLoc->getValue().getSExtValue();

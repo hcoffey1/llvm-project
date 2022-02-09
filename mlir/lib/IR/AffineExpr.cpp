@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <utility>
+
 #include "mlir/IR/AffineExpr.h"
 #include "AffineExprDetail.h"
 #include "mlir/IR/AffineExprVisitor.h"
@@ -28,7 +30,7 @@ void AffineExpr::walk(std::function<void(AffineExpr)> callback) const {
     std::function<void(AffineExpr)> callback;
 
     AffineExprWalker(std::function<void(AffineExpr)> callback)
-        : callback(callback) {}
+        : callback(std::move(callback)) {}
 
     void visitAffineBinaryOpExpr(AffineBinaryOpExpr expr) { callback(expr); }
     void visitConstantExpr(AffineConstantExpr expr) { callback(expr); }
@@ -36,7 +38,7 @@ void AffineExpr::walk(std::function<void(AffineExpr)> callback) const {
     void visitSymbolExpr(AffineSymbolExpr expr) { callback(expr); }
   };
 
-  AffineExprWalker(callback).walkPostOrder(*this);
+  AffineExprWalker(std::move(callback)).walkPostOrder(*this);
 }
 
 // Dispatch affine expression construction based on kind.
@@ -591,9 +593,10 @@ static AffineExpr simplifyAdd(AffineExpr lhs, AffineExpr rhs) {
     }
   }
 
-  // Detect and transform "expr - c * (expr floordiv c)" to "expr mod c". This
-  // leads to a much more efficient form when 'c' is a power of two, and in
-  // general a more compact and readable form.
+  // Detect and transform "expr - q * (expr floordiv q)" to "expr mod q", where
+  // q may be a constant or symbolic expression. This leads to a much more
+  // efficient form when 'c' is a power of two, and in general a more compact
+  // and readable form.
 
   // Process '(expr floordiv c) * (-c)'.
   if (!rBinOpExpr)
@@ -602,13 +605,33 @@ static AffineExpr simplifyAdd(AffineExpr lhs, AffineExpr rhs) {
   auto lrhs = rBinOpExpr.getLHS();
   auto rrhs = rBinOpExpr.getRHS();
 
+  AffineExpr llrhs, rlrhs;
+
+  // Check if lrhsBinOpExpr is of the form (expr floordiv q) * q, where q is a
+  // symbolic expression.
+  auto lrhsBinOpExpr = lrhs.dyn_cast<AffineBinaryOpExpr>();
+  // Check rrhsConstOpExpr = -1.
+  auto rrhsConstOpExpr = rrhs.dyn_cast<AffineConstantExpr>();
+  if (rrhsConstOpExpr && rrhsConstOpExpr.getValue() == -1 && lrhsBinOpExpr &&
+      lrhsBinOpExpr.getKind() == AffineExprKind::Mul) {
+    // Check llrhs = expr floordiv q.
+    llrhs = lrhsBinOpExpr.getLHS();
+    // Check rlrhs = q.
+    rlrhs = lrhsBinOpExpr.getRHS();
+    auto llrhsBinOpExpr = llrhs.dyn_cast<AffineBinaryOpExpr>();
+    if (!llrhsBinOpExpr || llrhsBinOpExpr.getKind() != AffineExprKind::FloorDiv)
+      return nullptr;
+    if (llrhsBinOpExpr.getRHS() == rlrhs && lhs == llrhsBinOpExpr.getLHS())
+      return lhs % rlrhs;
+  }
+
   // Process lrhs, which is 'expr floordiv c'.
   AffineBinaryOpExpr lrBinOpExpr = lrhs.dyn_cast<AffineBinaryOpExpr>();
   if (!lrBinOpExpr || lrBinOpExpr.getKind() != AffineExprKind::FloorDiv)
     return nullptr;
 
-  auto llrhs = lrBinOpExpr.getLHS();
-  auto rlrhs = lrBinOpExpr.getRHS();
+  llrhs = lrBinOpExpr.getLHS();
+  rlrhs = lrBinOpExpr.getRHS();
 
   if (lhs == llrhs && rlrhs == -rrhs) {
     return lhs % rlrhs;
@@ -999,7 +1022,7 @@ static AffineExpr getSemiAffineExprFromFlatForm(ArrayRef<int64_t> flatExprs,
   // as lhs/rhs, and store the indices, constant coefficient corresponding to
   // the indices in `coefficients` map, and affine expression corresponding to
   // in indices in `indexToExprMap` map.
-  for (auto it : llvm::enumerate(localExprs)) {
+  for (const auto &it : llvm::enumerate(localExprs)) {
     AffineExpr expr = it.value();
     if (flatExprs[numDims + numSymbols + it.index()] == 0)
       continue;

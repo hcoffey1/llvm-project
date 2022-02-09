@@ -25,6 +25,7 @@ Using Clang as a Compiler
    CrossCompilation
    ClangStaticAnalyzer
    ThreadSafetyAnalysis
+   DataFlowAnalysisIntro
    AddressSanitizer
    ThreadSanitizer
    MemorySanitizer
@@ -81,8 +82,11 @@ Using Clang Tools
    ClangFormat
    ClangFormatStyleOptions
    ClangFormattedStatus
+   ClangLinkerWrapper
    ClangNvlinkWrapper
+   ClangLinkerWrapper
    ClangOffloadBundler
+   ClangOffloadWrapper
 
 Design Documents
 ================
@@ -92,6 +96,7 @@ Design Documents
 
    InternalsManual
    DriverInternals
+   OffloadingDesign
    PCHInternals
    ItaniumMangleAbiTags
    HardwareAssistedAddressSanitizerDesign.rst

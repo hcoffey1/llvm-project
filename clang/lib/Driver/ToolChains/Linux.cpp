@@ -277,14 +277,11 @@ Linux::Linux(const Driver &D, const llvm::Triple &Triple, const ArgList &Args)
     // Android sysroots contain a library directory for each supported OS
     // version as well as some unversioned libraries in the usual multiarch
     // directory.
-    unsigned Major;
-    unsigned Minor;
-    unsigned Micro;
-    Triple.getEnvironmentVersion(Major, Minor, Micro);
-    addPathIfExists(D,
-                    SysRoot + "/usr/lib/" + MultiarchTriple + "/" +
-                        llvm::to_string(Major),
-                    Paths);
+    addPathIfExists(
+        D,
+        SysRoot + "/usr/lib/" + MultiarchTriple + "/" +
+            llvm::to_string(Triple.getEnvironmentVersion().getMajor()),
+        Paths);
   }
 
   addPathIfExists(D, SysRoot + "/usr/lib/" + MultiarchTriple, Paths);
@@ -325,6 +322,12 @@ ToolChain::RuntimeLibType Linux::GetDefaultRuntimeLibType() const {
   if (getTriple().isAndroid())
     return ToolChain::RLT_CompilerRT;
   return Generic_ELF::GetDefaultRuntimeLibType();
+}
+
+unsigned Linux::GetDefaultDwarfVersion() const {
+  if (getTriple().isAndroid())
+    return 4;
+  return ToolChain::GetDefaultDwarfVersion();
 }
 
 ToolChain::CXXStdlibType Linux::GetDefaultCXXStdlibType() const {
@@ -421,6 +424,9 @@ std::string Linux::getDynamicLinker(const ArgList &Args) const {
         (Triple.getEnvironment() == llvm::Triple::MuslEABIHF ||
          tools::arm::getARMFloatABI(*this, Args) == tools::arm::FloatABI::Hard))
       ArchName += "hf";
+    if (Arch == llvm::Triple::ppc &&
+        Triple.getSubArch() == llvm::Triple::PPCSubArch_spe)
+      ArchName = "powerpc-sf";
 
     return "/lib/ld-musl-" + ArchName + ".so.1";
   }
@@ -663,8 +669,8 @@ void Linux::AddIAMCUIncludeArgs(const ArgList &DriverArgs,
 }
 
 bool Linux::isPIEDefault(const llvm::opt::ArgList &Args) const {
-  return getTriple().isAndroid() || getTriple().isMusl() ||
-         getSanitizerArgs(Args).requiresPIE();
+  return CLANG_DEFAULT_PIE_ON_LINUX || getTriple().isAndroid() ||
+         getTriple().isMusl() || getSanitizerArgs(Args).requiresPIE();
 }
 
 bool Linux::IsAArch64OutlineAtomicsDefault(const ArgList &Args) const {
@@ -681,7 +687,7 @@ bool Linux::IsAArch64OutlineAtomicsDefault(const ArgList &Args) const {
 }
 
 bool Linux::IsMathErrnoDefault() const {
-  if (getTriple().isAndroid())
+  if (getTriple().isAndroid() || getTriple().isMusl())
     return false;
   return Generic_ELF::IsMathErrnoDefault();
 }
