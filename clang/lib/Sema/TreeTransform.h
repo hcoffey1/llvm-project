@@ -7613,6 +7613,12 @@ TreeTransform<Derived>::TransformBreakStmt(BreakStmt *S) {
 
 template<typename Derived>
 StmtResult
+TreeTransform<Derived>::TransformHCStmt(HCStmt *S) {
+  return S;
+}
+
+template<typename Derived>
+StmtResult
 TreeTransform<Derived>::TransformReturnStmt(ReturnStmt *S) {
   ExprResult Result = getDerived().TransformInitializer(S->getRetValue(),
                                                         /*NotCopyInit*/false);

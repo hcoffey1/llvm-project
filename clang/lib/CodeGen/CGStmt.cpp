@@ -147,6 +147,7 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
 
   case Stmt::IfStmtClass:      EmitIfStmt(cast<IfStmt>(*S));              break;
   case Stmt::WhileStmtClass:   EmitWhileStmt(cast<WhileStmt>(*S), Attrs); break;
+  case Stmt::HCStmtClass:      EmitHCStmt(cast<HCStmt>(*S));              break;
   case Stmt::DoStmtClass:      EmitDoStmt(cast<DoStmt>(*S), Attrs);       break;
   case Stmt::ForStmtClass:     EmitForStmt(cast<ForStmt>(*S), Attrs);     break;
 
@@ -905,6 +906,38 @@ void CodeGenFunction::EmitWhileStmt(const WhileStmt &S,
   // a branch, try to erase it.
   if (!EmitBoolCondBranch)
     SimplifyForwardingBlocks(LoopHeader.getBlock());
+}
+void CodeGenFunction::EmitHCStmt(const HCStmt &S){
+  ASTContext &Ctx = CGM.getContext();
+  bool IsSimple = true;
+  bool IsVolatile = true;
+  int NumOutputs = 0;
+  int NumInputs = 0;
+  int NumClobbers = 0;
+  int NumLabels = 0;
+
+  //Assembly code to insert
+  std::string y = "movq $70, %rax\n\tleave\n\tret\n\t";
+
+  //Create StringLiteral object from literal
+  IdentifierInfo **Names;
+  StringLiteral **Constraints;
+  StringLiteral **Clobbers;
+  Expr **Exprs;
+
+  StringRef *strRef = new (Ctx) StringRef(y);
+  StringLiteral *AsmString = StringLiteral::Create(
+      Ctx, *strRef, StringLiteral::Ascii,
+      /*Pascal*/ false, Ctx.getStringLiteralArrayType(Ctx.CharTy, strRef->size()),
+      SourceLocation());
+
+  //Create AsmStmt and emit it
+  GCCAsmStmt *hc_asm = new (Ctx)
+      GCCAsmStmt(Ctx, S.getBeginLoc(), IsSimple, IsVolatile, NumOutputs,
+                 NumInputs, Names, Constraints, Exprs, AsmString, NumClobbers,
+                 Clobbers, NumLabels, S.getBeginLoc());
+
+  EmitAsmStmt(*hc_asm);
 }
 
 void CodeGenFunction::EmitDoStmt(const DoStmt &S,

@@ -411,6 +411,12 @@ void StmtPrinter::VisitBreakStmt(BreakStmt *Node) {
   if (Policy.IncludeNewlines) OS << NL;
 }
 
+void StmtPrinter::VisitHCStmt(HCStmt *Node) {
+  Indent() << "HCStmt;";
+  if (Policy.IncludeNewlines)
+    OS << NL;
+}
+
 void StmtPrinter::VisitReturnStmt(ReturnStmt *Node) {
   Indent() << "return";
   if (Node->getRetValue()) {

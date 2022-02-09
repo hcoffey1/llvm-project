@@ -279,6 +279,10 @@ void StmtProfiler::VisitDoStmt(const DoStmt *S) {
   VisitStmt(S);
 }
 
+void StmtProfiler::VisitHCStmt(const HCStmt *S) {
+  VisitStmt(S);
+}
+
 void StmtProfiler::VisitForStmt(const ForStmt *S) {
   VisitStmt(S);
 }

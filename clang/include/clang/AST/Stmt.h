@@ -2483,16 +2483,27 @@ public:
 class HCStmt : public Stmt {
   SourceLocation loc;
 
-  public:
-    HCStmt(SourceLocation _loc)
-    : Stmt(DoStmtClass)
-    {
-      loc = _loc;
-    }
+public:
+  HCStmt(SourceLocation _loc) : Stmt(HCStmtClass) { loc = _loc; }
 
-    SourceLocation getBeginLoc() const { return loc; }
-    SourceLocation getEndLoc() const { return loc; }
+  explicit HCStmt(EmptyShell Empty) : Stmt(HCStmtClass, Empty) {}
 
+  void setLoc(SourceLocation L) { loc = L; }
+  SourceLocation getBeginLoc() const { return loc; }
+  SourceLocation getEndLoc() const { return loc; }
+
+  // Iterators
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == HCStmtClass;
+  }
 };
 
 /// DoStmt - This represents a 'do/while' stmt.

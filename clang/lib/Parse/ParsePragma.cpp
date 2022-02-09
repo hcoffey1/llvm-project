@@ -3423,12 +3423,10 @@ StmtResult Parser::HandlePragmaHC()
   assert(Tok.is(tok::annot_pragma_hc_handle));
 
   while (Tok.is(tok::annot_pragma_hc_handle)){
-    ConsumeToken(); // The argument token.
+    ConsumeAnnotationToken(); // The argument token.
   }
 
-  //return Actions.ActOnPragmaHC(Tok.getLocation());
-
-  return StmtEmpty();
+  return Actions.ActOnPragmaHC(Tok.getLocation());
 }
 
 /// Handle the loop unroll optimization pragmas.

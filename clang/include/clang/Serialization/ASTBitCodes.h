@@ -1552,6 +1552,9 @@ enum StmtCode {
   /// A DoStmt record.
   STMT_DO,
 
+  /// A HCStmt record.
+  STMT_HC,
+
   /// A ForStmt record.
   STMT_FOR,
 
