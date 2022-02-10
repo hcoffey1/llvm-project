@@ -32,6 +32,9 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include <fstream>
+#include <iostream>
+//#include "llvm/IR/Function.h"
 
 using namespace clang;
 using namespace CodeGen;
@@ -907,6 +910,7 @@ void CodeGenFunction::EmitWhileStmt(const WhileStmt &S,
   if (!EmitBoolCondBranch)
     SimplifyForwardingBlocks(LoopHeader.getBlock());
 }
+
 void CodeGenFunction::EmitHCStmt(const HCStmt &S){
   ASTContext &Ctx = CGM.getContext();
   bool IsSimple = true;
@@ -916,22 +920,58 @@ void CodeGenFunction::EmitHCStmt(const HCStmt &S){
   int NumClobbers = 0;
   int NumLabels = 0;
 
-  //Assembly code to insert
-  std::string y = "movq $70, %rax\n\tleave\n\tret\n\t";
 
-  //Create StringLiteral object from literal
+  //EmitCallExpr();
+
+
+  //llvm::Value *sizeVal = llvm::ConstantInt::get(llvm::Type::getInt32Ty(CGM.getContext()), 10);
+  //llvm::Value *ptrVal = llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(CGM.getContext()));
+
+  //llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::xray_customevent);
+  //auto FTy = F->getFunctionType();
+  //auto Arg0 = E->getArg(0);
+  //auto Arg0Val = EmitScalarExpr(Arg0);
+  //auto Arg0Ty = Arg0->getType();
+  //auto PTy0 = FTy->getParamType(0);
+  //if (PTy0 != Arg0Val->getType()) {
+  //  if (Arg0Ty->isArrayType())
+  //    Arg0Val = EmitArrayToPointerDecay(Arg0).getPointer();
+  //  else
+  //    Arg0Val = Builder.CreatePointerCast(Arg0Val, PTy0);
+  //}
+  //auto Arg1 = EmitScalarExpr(E->getArg(1));
+  //auto PTy1 = FTy->getParamType(1);
+  //if (PTy1 != Arg1->getType())
+  //  Arg1 = Builder.CreateTruncOrBitCast(Arg1, PTy1);
+  //return RValue::get(Builder.CreateCall(F, {Arg0Val, Arg1}));
+
+  // Assembly code to insert
+  std::string hc_asm_line = "";
+
+  std::string asmFilePath = "/media/hdd0/research/hc_as.S";
+  std::string line;
+  std::ifstream file;
+  file.open(asmFilePath);
+  while (std::getline(file, line)) {
+    hc_asm_line += line + "\n";
+  }
+
+  std::cout << "Line produces is : " << hc_asm_line << "\n";
+
+  // Create StringLiteral object from literal
   IdentifierInfo **Names;
   StringLiteral **Constraints;
   StringLiteral **Clobbers;
   Expr **Exprs;
 
-  StringRef *strRef = new (Ctx) StringRef(y);
+  StringRef *strRef = new (Ctx) StringRef(hc_asm_line);
   StringLiteral *AsmString = StringLiteral::Create(
       Ctx, *strRef, StringLiteral::Ascii,
-      /*Pascal*/ false, Ctx.getStringLiteralArrayType(Ctx.CharTy, strRef->size()),
+      /*Pascal*/ false,
+      Ctx.getStringLiteralArrayType(Ctx.CharTy, strRef->size()),
       SourceLocation());
 
-  //Create AsmStmt and emit it
+  // Create AsmStmt and emit it
   GCCAsmStmt *hc_asm = new (Ctx)
       GCCAsmStmt(Ctx, S.getBeginLoc(), IsSimple, IsVolatile, NumOutputs,
                  NumInputs, Names, Constraints, Exprs, AsmString, NumClobbers,
