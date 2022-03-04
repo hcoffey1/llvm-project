@@ -948,7 +948,7 @@ void CodeGenFunction::EmitHCStmt(const HCStmt &S){
   // Assembly code to insert
   std::string hc_asm_line = "";
 
-  std::string asmFilePath = "/media/hdd0/research/hc_as.S";
+  std::string asmFilePath = std::getenv("TOOL_ASM_PATH");
   std::string line;
   std::ifstream file;
   file.open(asmFilePath);
