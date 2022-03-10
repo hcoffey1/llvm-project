@@ -945,9 +945,12 @@ void CodeGenFunction::EmitHCStmt(const HCStmt &S){
   //  Arg1 = Builder.CreateTruncOrBitCast(Arg1, PTy1);
   //return RValue::get(Builder.CreateCall(F, {Arg0Val, Arg1}));
 
-  // Assembly code to insert
-  std::string hc_asm_line = "";
 
+  // Assembly code to insert
+  std::string hc_asm_line = "#TOOL_PASS_BEGIN";
+
+  //If we want to insert assembly from file
+  #if 0
   std::string asmFilePath = std::getenv("TOOL_ASM_PATH");
   std::string line;
   std::ifstream file;
@@ -955,6 +958,9 @@ void CodeGenFunction::EmitHCStmt(const HCStmt &S){
   while (std::getline(file, line)) {
     hc_asm_line += line + "\n";
   }
+  #endif
+
+  hc_asm_line += " " + std::to_string(S.getGroupID());
 
   std::cout << "Line produces is : " << hc_asm_line << "\n";
 

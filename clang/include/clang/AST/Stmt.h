@@ -2482,9 +2482,12 @@ public:
 /// HCStmt - Test statement
 class HCStmt : public Stmt {
   SourceLocation loc;
+  uint16_t groupID;
 
 public:
-  HCStmt(SourceLocation _loc) : Stmt(HCStmtClass) { loc = _loc; }
+  uint16_t getGroupID() const {return groupID;}
+
+  HCStmt(SourceLocation _loc, uint16_t _groupID=0) : Stmt(HCStmtClass) { loc = _loc; groupID = _groupID;}
 
   explicit HCStmt(EmptyShell Empty) : Stmt(HCStmtClass, Empty) {}
 

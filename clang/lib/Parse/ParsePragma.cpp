@@ -3405,8 +3405,14 @@ void PragmaHCHandler::HandlePragma(Preprocessor &PP,
                                    PragmaIntroducer Introducer,
                                    Token &Tok){
   Token tmpTok;
+  int32_t * groupID = new int32_t();
+  *groupID = 0;
   while(tmpTok.isNot(tok::eod))
   {
+    if (tmpTok.isLiteral())
+    {
+      *groupID = atoi(tmpTok.getLiteralData());
+    }
     PP.Lex(tmpTok);
   }
 
@@ -3414,6 +3420,7 @@ void PragmaHCHandler::HandlePragma(Preprocessor &PP,
   tmpTok.setKind(tok::annot_pragma_hc_handle);
   tmpTok.setLocation(Tok.getLocation());
   tmpTok.setAnnotationEndLoc(Tok.getLocation());
+  tmpTok.setAnnotationValue(groupID);
 
   PP.EnterToken(tmpTok, false);
 }
@@ -3421,12 +3428,13 @@ void PragmaHCHandler::HandlePragma(Preprocessor &PP,
 StmtResult Parser::HandlePragmaHC()
 {
   assert(Tok.is(tok::annot_pragma_hc_handle));
+  int32_t groupId = *(int32_t*)(Tok.getAnnotationValue());
 
   while (Tok.is(tok::annot_pragma_hc_handle)){
     ConsumeAnnotationToken(); // The argument token.
   }
 
-  return Actions.ActOnPragmaHC(Tok.getLocation());
+  return Actions.ActOnPragmaHC(Tok.getLocation(), groupId);
 }
 
 /// Handle the loop unroll optimization pragmas.
