@@ -286,6 +286,11 @@ void ASTStmtReader::VisitBeginInstrumentStmt(BeginInstrumentStmt*S) {
   S->setLoc(readSourceLocation());
 }
 
+void ASTStmtReader::VisitEndInstrumentStmt(EndInstrumentStmt*S) {
+  VisitStmt(S);
+  S->setLoc(readSourceLocation());
+}
+
 void ASTStmtReader::VisitDoStmt(DoStmt *S) {
   VisitStmt(S);
   S->setCond(Record.readSubExpr());
@@ -2794,6 +2799,10 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
 
     case STMT_BEGIN_INSTRUMENT:
       S = new (Context) BeginInstrumentStmt(Empty);
+      break;
+
+    case STMT_END_INSTRUMENT:
+      S = new (Context) EndInstrumentStmt(Empty);
       break;
 
     case STMT_FOR:

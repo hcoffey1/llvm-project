@@ -283,6 +283,10 @@ void StmtProfiler::VisitBeginInstrumentStmt(const BeginInstrumentStmt *S) {
   VisitStmt(S);
 }
 
+void StmtProfiler::VisitEndInstrumentStmt(const EndInstrumentStmt *S) {
+  VisitStmt(S);
+}
+
 void StmtProfiler::VisitForStmt(const ForStmt *S) {
   VisitStmt(S);
 }

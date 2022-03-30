@@ -7659,6 +7659,12 @@ TreeTransform<Derived>::TransformBeginInstrumentStmt(BeginInstrumentStmt *S) {
 
 template<typename Derived>
 StmtResult
+TreeTransform<Derived>::TransformEndInstrumentStmt(EndInstrumentStmt *S) {
+  return S;
+}
+
+template<typename Derived>
+StmtResult
 TreeTransform<Derived>::TransformReturnStmt(ReturnStmt *S) {
   ExprResult Result = getDerived().TransformInitializer(S->getRetValue(),
                                                         /*NotCopyInit*/false);

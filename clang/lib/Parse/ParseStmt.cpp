@@ -442,6 +442,10 @@ Retry:
   case tok::annot_pragma_begin_instrument:
     ProhibitAttributes(Attrs);
     return HandlePragmaBeginInstrument();
+
+  case tok::annot_pragma_end_instrument:
+    ProhibitAttributes(Attrs);
+    return HandlePragmaEndInstrument();
   }
 
   // If we reached this code, the statement must end in a semicolon.

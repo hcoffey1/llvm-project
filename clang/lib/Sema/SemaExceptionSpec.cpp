@@ -1427,6 +1427,7 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
   case Stmt::DefaultStmtClass:
   case Stmt::DoStmtClass:
   case Stmt::BeginInstrumentStmtClass:
+  case Stmt::EndInstrumentStmtClass:
   case Stmt::ForStmtClass:
   case Stmt::GCCAsmStmtClass:
   case Stmt::GotoStmtClass:

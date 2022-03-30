@@ -3233,6 +3233,7 @@ public:
   void EmitWhileStmt(const WhileStmt &S,
                      ArrayRef<const Attr *> Attrs = None);
   void EmitBeginInstrumentStmt(const BeginInstrumentStmt &S);
+  void EmitEndInstrumentStmt(const EndInstrumentStmt &S);
   void EmitDoStmt(const DoStmt &S, ArrayRef<const Attr *> Attrs = None);
   void EmitForStmt(const ForStmt &S,
                    ArrayRef<const Attr *> Attrs = None);

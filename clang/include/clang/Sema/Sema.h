@@ -10186,6 +10186,7 @@ public:
                                LangOptions::FPExceptionModeKind);
 
   StmtResult ActOnPragmaBeginInstrument(SourceLocation Loc, uint16_t groupID=0);
+  StmtResult ActOnPragmaEndInstrument(SourceLocation Loc, uint16_t groupID=0);
 
   /// Called to set constant rounding mode for floating point operations.
   void setRoundingMode(SourceLocation Loc, llvm::RoundingMode);

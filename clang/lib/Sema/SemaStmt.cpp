@@ -1698,6 +1698,10 @@ StmtResult Sema::ActOnPragmaBeginInstrument(SourceLocation Loc, uint16_t groupID
   return new (Context) BeginInstrumentStmt(Loc, groupID);
 }
 
+StmtResult Sema::ActOnPragmaEndInstrument(SourceLocation Loc, uint16_t groupID)
+{
+  return new (Context) EndInstrumentStmt(Loc, groupID);
+}
 
 StmtResult
 Sema::ActOnDoStmt(SourceLocation DoLoc, Stmt *Body,

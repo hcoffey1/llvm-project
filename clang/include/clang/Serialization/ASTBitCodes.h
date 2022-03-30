@@ -1558,6 +1558,9 @@ enum StmtCode {
   /// A BeginInstrumentStmt record.
   STMT_BEGIN_INSTRUMENT,
 
+  /// A EndInstrumentStmt record.
+  STMT_END_INSTRUMENT,
+
   /// A ForStmt record.
   STMT_FOR,
 

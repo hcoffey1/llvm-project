@@ -417,6 +417,12 @@ void StmtPrinter::VisitBeginInstrumentStmt(BeginInstrumentStmt *Node) {
     OS << NL;
 }
 
+void StmtPrinter::VisitEndInstrumentStmt(EndInstrumentStmt *Node) {
+  Indent() << "EndInstrumentStmt;";
+  if (Policy.IncludeNewlines)
+    OS << NL;
+}
+
 void StmtPrinter::VisitReturnStmt(ReturnStmt *Node) {
   Indent() << "return";
   if (Node->getRetValue()) {

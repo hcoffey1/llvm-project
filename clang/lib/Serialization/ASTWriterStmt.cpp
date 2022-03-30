@@ -209,6 +209,12 @@ void ASTStmtWriter::VisitBeginInstrumentStmt(BeginInstrumentStmt *S) {
   Code = serialization::STMT_BEGIN_INSTRUMENT;
 }
 
+void ASTStmtWriter::VisitEndInstrumentStmt(EndInstrumentStmt *S) {
+  VisitStmt(S);
+  Record.AddSourceLocation(S->getBeginLoc());
+  Code = serialization::STMT_END_INSTRUMENT;
+}
+
 void ASTStmtWriter::VisitDoStmt(DoStmt *S) {
   VisitStmt(S);
   Record.AddStmt(S->getCond());

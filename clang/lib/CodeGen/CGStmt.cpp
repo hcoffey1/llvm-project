@@ -153,6 +153,9 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::BeginInstrumentStmtClass:
         EmitBeginInstrumentStmt(cast<BeginInstrumentStmt>(*S));
         break;
+  case Stmt::EndInstrumentStmtClass:
+        EmitEndInstrumentStmt(cast<EndInstrumentStmt>(*S));
+        break;
   case Stmt::DoStmtClass:      EmitDoStmt(cast<DoStmt>(*S), Attrs);       break;
   case Stmt::ForStmtClass:     EmitForStmt(cast<ForStmt>(*S), Attrs);     break;
 
@@ -950,6 +953,81 @@ void CodeGenFunction::EmitBeginInstrumentStmt(const BeginInstrumentStmt &S){
 
   // Assembly code to insert
   std::string hc_asm_line = "#TOOL_PASS_BEGIN";
+
+  //If we want to insert assembly from file
+  #if 0
+  std::string asmFilePath = std::getenv("TOOL_ASM_PATH");
+  std::string line;
+  std::ifstream file;
+  file.open(asmFilePath);
+  while (std::getline(file, line)) {
+    hc_asm_line += line + "\n";
+  }
+  #endif
+
+  hc_asm_line += " " + std::to_string(S.getGroupID());
+
+  std::cout << "Line produces is : " << hc_asm_line << "\n";
+
+  // Create StringLiteral object from literal
+  IdentifierInfo **Names;
+  StringLiteral **Constraints;
+  StringLiteral **Clobbers;
+  Expr **Exprs;
+
+  StringRef *strRef = new (Ctx) StringRef(hc_asm_line);
+  StringLiteral *AsmString = StringLiteral::Create(
+      Ctx, *strRef, StringLiteral::Ascii,
+      /*Pascal*/ false,
+      Ctx.getStringLiteralArrayType(Ctx.CharTy, strRef->size()),
+      SourceLocation());
+
+  // Create AsmStmt and emit it
+  GCCAsmStmt *hc_asm = new (Ctx)
+      GCCAsmStmt(Ctx, S.getBeginLoc(), IsSimple, IsVolatile, NumOutputs,
+                 NumInputs, Names, Constraints, Exprs, AsmString, NumClobbers,
+                 Clobbers, NumLabels, S.getBeginLoc());
+
+  EmitAsmStmt(*hc_asm);
+}
+
+void CodeGenFunction::EmitEndInstrumentStmt(const EndInstrumentStmt &S){
+  ASTContext &Ctx = CGM.getContext();
+  bool IsSimple = true;
+  bool IsVolatile = true;
+  int NumOutputs = 0;
+  int NumInputs = 0;
+  int NumClobbers = 0;
+  int NumLabels = 0;
+
+
+  //EmitCallExpr();
+
+
+  //llvm::Value *sizeVal = llvm::ConstantInt::get(llvm::Type::getInt32Ty(CGM.getContext()), 10);
+  //llvm::Value *ptrVal = llvm::ConstantPointerNull::get(llvm::Type::getInt8PtrTy(CGM.getContext()));
+
+  //llvm::Function *F = CGM.getIntrinsic(llvm::Intrinsic::xray_customevent);
+  //auto FTy = F->getFunctionType();
+  //auto Arg0 = E->getArg(0);
+  //auto Arg0Val = EmitScalarExpr(Arg0);
+  //auto Arg0Ty = Arg0->getType();
+  //auto PTy0 = FTy->getParamType(0);
+  //if (PTy0 != Arg0Val->getType()) {
+  //  if (Arg0Ty->isArrayType())
+  //    Arg0Val = EmitArrayToPointerDecay(Arg0).getPointer();
+  //  else
+  //    Arg0Val = Builder.CreatePointerCast(Arg0Val, PTy0);
+  //}
+  //auto Arg1 = EmitScalarExpr(E->getArg(1));
+  //auto PTy1 = FTy->getParamType(1);
+  //if (PTy1 != Arg1->getType())
+  //  Arg1 = Builder.CreateTruncOrBitCast(Arg1, PTy1);
+  //return RValue::get(Builder.CreateCall(F, {Arg0Val, Arg1}));
+
+
+  // Assembly code to insert
+  std::string hc_asm_line = "#TOOL_PASS_END";
 
   //If we want to insert assembly from file
   #if 0

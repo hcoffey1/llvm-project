@@ -1319,6 +1319,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::DefaultStmtClass:
     case Stmt::DoStmtClass:
     case Stmt::BeginInstrumentStmtClass:
+    case Stmt::EndInstrumentStmtClass:
     case Stmt::ForStmtClass:
     case Stmt::GotoStmtClass:
     case Stmt::IfStmtClass:

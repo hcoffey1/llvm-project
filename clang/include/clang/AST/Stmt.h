@@ -2509,6 +2509,36 @@ public:
   }
 };
 
+/// End Instrumentation Statement
+class EndInstrumentStmt : public Stmt {
+  SourceLocation loc;
+  uint16_t groupID;
+
+public:
+  uint16_t getGroupID() const {return groupID;}
+
+  EndInstrumentStmt(SourceLocation _loc, uint16_t _groupID=0) : Stmt(EndInstrumentStmtClass) { loc = _loc; groupID = _groupID;}
+
+  explicit EndInstrumentStmt(EmptyShell Empty) : Stmt(EndInstrumentStmtClass, Empty) {}
+
+  void setLoc(SourceLocation L) { loc = L; }
+  SourceLocation getBeginLoc() const { return loc; }
+  SourceLocation getEndLoc() const { return loc; }
+
+  // Iterators
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  const_child_range children() const {
+    return const_child_range(const_child_iterator(), const_child_iterator());
+  }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == EndInstrumentStmtClass;
+  }
+};
+
 /// DoStmt - This represents a 'do/while' stmt.
 class DoStmt : public Stmt {
   enum { BODY, COND, END_EXPR };
