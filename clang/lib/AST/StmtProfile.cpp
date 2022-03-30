@@ -279,7 +279,7 @@ void StmtProfiler::VisitDoStmt(const DoStmt *S) {
   VisitStmt(S);
 }
 
-void StmtProfiler::VisitHCStmt(const HCStmt *S) {
+void StmtProfiler::VisitBeginInstrumentStmt(const BeginInstrumentStmt *S) {
   VisitStmt(S);
 }
 

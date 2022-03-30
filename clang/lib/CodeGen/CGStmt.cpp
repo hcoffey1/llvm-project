@@ -150,7 +150,9 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
 
   case Stmt::IfStmtClass:      EmitIfStmt(cast<IfStmt>(*S));              break;
   case Stmt::WhileStmtClass:   EmitWhileStmt(cast<WhileStmt>(*S), Attrs); break;
-  case Stmt::HCStmtClass:      EmitHCStmt(cast<HCStmt>(*S));              break;
+  case Stmt::BeginInstrumentStmtClass:
+        EmitBeginInstrumentStmt(cast<BeginInstrumentStmt>(*S));
+        break;
   case Stmt::DoStmtClass:      EmitDoStmt(cast<DoStmt>(*S), Attrs);       break;
   case Stmt::ForStmtClass:     EmitForStmt(cast<ForStmt>(*S), Attrs);     break;
 
@@ -911,7 +913,7 @@ void CodeGenFunction::EmitWhileStmt(const WhileStmt &S,
     SimplifyForwardingBlocks(LoopHeader.getBlock());
 }
 
-void CodeGenFunction::EmitHCStmt(const HCStmt &S){
+void CodeGenFunction::EmitBeginInstrumentStmt(const BeginInstrumentStmt &S){
   ASTContext &Ctx = CGM.getContext();
   bool IsSimple = true;
   bool IsVolatile = true;

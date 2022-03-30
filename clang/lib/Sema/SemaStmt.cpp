@@ -1693,9 +1693,9 @@ StmtResult Sema::ActOnWhileStmt(SourceLocation WhileLoc,
                            WhileLoc, LParenLoc, RParenLoc);
 }
 
-StmtResult Sema::ActOnPragmaHC(SourceLocation Loc, uint16_t groupID)
+StmtResult Sema::ActOnPragmaBeginInstrument(SourceLocation Loc, uint16_t groupID)
 {
-  return new (Context) HCStmt(Loc, groupID);
+  return new (Context) BeginInstrumentStmt(Loc, groupID);
 }
 
 

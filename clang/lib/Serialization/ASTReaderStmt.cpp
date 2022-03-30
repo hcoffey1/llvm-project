@@ -281,7 +281,7 @@ void ASTStmtReader::VisitWhileStmt(WhileStmt *S) {
   S->setRParenLoc(readSourceLocation());
 }
 
-void ASTStmtReader::VisitHCStmt(HCStmt*S) {
+void ASTStmtReader::VisitBeginInstrumentStmt(BeginInstrumentStmt*S) {
   VisitStmt(S);
   S->setLoc(readSourceLocation());
 }
@@ -2792,8 +2792,8 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
       S = new (Context) DoStmt(Empty);
       break;
 
-    case STMT_HC:
-      S = new (Context) HCStmt(Empty);
+    case STMT_BEGIN_INSTRUMENT:
+      S = new (Context) BeginInstrumentStmt(Empty);
       break;
 
     case STMT_FOR:

@@ -239,8 +239,8 @@ struct PragmaLoopHintHandler : public PragmaHandler {
                     Token &FirstToken) override;
 };
 
-struct PragmaHCHandler : public PragmaHandler {
-  PragmaHCHandler(const char *name) : PragmaHandler(name) {}
+struct PragmaBeginInstrumentHandler : public PragmaHandler {
+  PragmaBeginInstrumentHandler(const char *name) : PragmaHandler(name) {}
   void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
                     Token &FirstToken) override;
 };
@@ -473,9 +473,10 @@ void Parser::initializePragmaHandlers() {
   LoopHintHandler = std::make_unique<PragmaLoopHintHandler>();
   PP.AddPragmaHandler("clang", LoopHintHandler.get());
 
-  HCHandler = std::make_unique<PragmaHCHandler>("hc_instrument");
-  PP.AddPragmaHandler(HCHandler.get());
-  PP.AddPragmaHandler("GCC", HCHandler.get());
+  //BeginInstrumentHandler = std::make_unique<PragmaHCHandler>("begin_instrument");
+  BeginInstrumentHandler = std::make_unique<PragmaBeginInstrumentHandler>("begin_instrument");
+  PP.AddPragmaHandler(BeginInstrumentHandler.get());
+  PP.AddPragmaHandler("GCC", BeginInstrumentHandler.get());
 
   UnrollHintHandler = std::make_unique<PragmaUnrollHintHandler>("unroll");
   PP.AddPragmaHandler(UnrollHintHandler.get());
@@ -3400,8 +3401,8 @@ void PragmaLoopHintHandler::HandlePragma(Preprocessor &PP,
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
 }
 
-///Testing pragma implementation HC
-void PragmaHCHandler::HandlePragma(Preprocessor &PP,
+//Preprocessor handling for pragma, generate token
+void PragmaBeginInstrumentHandler::HandlePragma(Preprocessor &PP,
                                    PragmaIntroducer Introducer,
                                    Token &Tok){
   Token tmpTok;
@@ -3417,7 +3418,7 @@ void PragmaHCHandler::HandlePragma(Preprocessor &PP,
   }
 
   tmpTok.startToken();
-  tmpTok.setKind(tok::annot_pragma_hc_handle);
+  tmpTok.setKind(tok::annot_pragma_begin_instrument);
   tmpTok.setLocation(Tok.getLocation());
   tmpTok.setAnnotationEndLoc(Tok.getLocation());
   tmpTok.setAnnotationValue(groupID);
@@ -3425,16 +3426,17 @@ void PragmaHCHandler::HandlePragma(Preprocessor &PP,
   PP.EnterToken(tmpTok, false);
 }
 
-StmtResult Parser::HandlePragmaHC()
+//Operate on token in token stream
+StmtResult Parser::HandlePragmaBeginInstrument()
 {
-  assert(Tok.is(tok::annot_pragma_hc_handle));
+  assert(Tok.is(tok::annot_pragma_begin_instrument));
   int32_t groupId = *(int32_t*)(Tok.getAnnotationValue());
 
-  while (Tok.is(tok::annot_pragma_hc_handle)){
+  while (Tok.is(tok::annot_pragma_begin_instrument)){
     ConsumeAnnotationToken(); // The argument token.
   }
 
-  return Actions.ActOnPragmaHC(Tok.getLocation(), groupId);
+  return Actions.ActOnPragmaBeginInstrument(Tok.getLocation(), groupId);
 }
 
 /// Handle the loop unroll optimization pragmas.

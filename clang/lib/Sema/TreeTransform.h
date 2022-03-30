@@ -7653,7 +7653,7 @@ TreeTransform<Derived>::TransformBreakStmt(BreakStmt *S) {
 
 template<typename Derived>
 StmtResult
-TreeTransform<Derived>::TransformHCStmt(HCStmt *S) {
+TreeTransform<Derived>::TransformBeginInstrumentStmt(BeginInstrumentStmt *S) {
   return S;
 }
 

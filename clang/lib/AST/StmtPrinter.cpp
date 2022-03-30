@@ -411,8 +411,8 @@ void StmtPrinter::VisitBreakStmt(BreakStmt *Node) {
   if (Policy.IncludeNewlines) OS << NL;
 }
 
-void StmtPrinter::VisitHCStmt(HCStmt *Node) {
-  Indent() << "HCStmt;";
+void StmtPrinter::VisitBeginInstrumentStmt(BeginInstrumentStmt *Node) {
+  Indent() << "BeginInstrumentStmt;";
   if (Policy.IncludeNewlines)
     OS << NL;
 }

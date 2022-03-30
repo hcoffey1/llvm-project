@@ -1555,8 +1555,8 @@ enum StmtCode {
   /// A DoStmt record.
   STMT_DO,
 
-  /// A HCStmt record.
-  STMT_HC,
+  /// A BeginInstrumentStmt record.
+  STMT_BEGIN_INSTRUMENT,
 
   /// A ForStmt record.
   STMT_FOR,

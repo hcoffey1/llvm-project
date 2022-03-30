@@ -203,10 +203,10 @@ void ASTStmtWriter::VisitWhileStmt(WhileStmt *S) {
   Code = serialization::STMT_WHILE;
 }
 
-void ASTStmtWriter::VisitHCStmt(HCStmt *S) {
+void ASTStmtWriter::VisitBeginInstrumentStmt(BeginInstrumentStmt *S) {
   VisitStmt(S);
   Record.AddSourceLocation(S->getBeginLoc());
-  Code = serialization::STMT_HC;
+  Code = serialization::STMT_BEGIN_INSTRUMENT;
 }
 
 void ASTStmtWriter::VisitDoStmt(DoStmt *S) {

@@ -2479,17 +2479,17 @@ public:
   }
 };
 
-/// HCStmt - Test statement
-class HCStmt : public Stmt {
+/// Begin Instrumentation Statement
+class BeginInstrumentStmt : public Stmt {
   SourceLocation loc;
   uint16_t groupID;
 
 public:
   uint16_t getGroupID() const {return groupID;}
 
-  HCStmt(SourceLocation _loc, uint16_t _groupID=0) : Stmt(HCStmtClass) { loc = _loc; groupID = _groupID;}
+  BeginInstrumentStmt(SourceLocation _loc, uint16_t _groupID=0) : Stmt(BeginInstrumentStmtClass) { loc = _loc; groupID = _groupID;}
 
-  explicit HCStmt(EmptyShell Empty) : Stmt(HCStmtClass, Empty) {}
+  explicit BeginInstrumentStmt(EmptyShell Empty) : Stmt(BeginInstrumentStmtClass, Empty) {}
 
   void setLoc(SourceLocation L) { loc = L; }
   SourceLocation getBeginLoc() const { return loc; }
@@ -2505,7 +2505,7 @@ public:
   }
 
   static bool classof(const Stmt *T) {
-    return T->getStmtClass() == HCStmtClass;
+    return T->getStmtClass() == BeginInstrumentStmtClass;
   }
 };
 
