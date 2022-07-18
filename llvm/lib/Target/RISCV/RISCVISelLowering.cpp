@@ -2975,6 +2975,14 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
   switch (Op.getOpcode()) {
   default:
     report_fatal_error("unimplemented operand");
+  // default: {
+  //   char tmp[1025];
+  //   sprintf(tmp, "unimplemented operand! Opcode is %u not %u", Op.getOpcode(), TargetOpcode::PATCHABLE_EVENT_CALL);
+  //   const char* err_str = tmp;
+  //   report_fatal_error(err_str);
+  // }
+  //case 65496:
+  //  return Op;
   case ISD::GlobalAddress:
     return lowerGlobalAddress(Op, DAG);
   case ISD::BlockAddress:
@@ -8972,6 +8980,8 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     return emitQuietFCMP(MI, BB, RISCV::FLE_D, RISCV::FEQ_D, Subtarget);
   case RISCV::PseudoQuietFLT_D:
     return emitQuietFCMP(MI, BB, RISCV::FLT_D, RISCV::FEQ_D, Subtarget);
+  case TargetOpcode::PATCHABLE_EVENT_CALL:
+    return BB;
   }
 }
 

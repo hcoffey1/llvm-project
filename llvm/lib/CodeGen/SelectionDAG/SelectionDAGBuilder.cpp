@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <stdio.h>
 #include "SelectionDAGBuilder.h"
 #include "SDNodeDbgValue.h"
 #include "llvm/ADT/APFloat.h"
@@ -6956,7 +6957,8 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     // specific calling convention, and only for x86_64.
     // FIXME: Support other platforms later.
     const auto &Triple = DAG.getTarget().getTargetTriple();
-    if (Triple.getArch() != Triple::x86_64)
+    //if (Triple.getArch() != Triple::x86_64) //&& (Triple.getArch() != Triple::riscv64))
+    if ((Triple.getArch() != Triple::x86_64) && (Triple.getArch() != Triple::riscv64))
       return;
 
     SmallVector<SDValue, 8> Ops;
@@ -6976,7 +6978,13 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     // them across calls to the intrinsic.
     MachineSDNode *MN = DAG.getMachineNode(TargetOpcode::PATCHABLE_EVENT_CALL,
                                            sdl, NodeTys, Ops);
+    //printf("MN Opcode: %u\n", MN->getOpcode());
+    //printf("MN Machine Opcode: %u\n", MN->getMachineOpcode());
+    //printf("MN NumOperands: %u\n", MN->getNumOperands());
     SDValue patchableNode = SDValue(MN, 0);
+    //printf("SD Opcode: %u\n", patchableNode.getOpcode());
+    //printf("SD Machine Opcode: %u\n", patchableNode.getMachineOpcode());
+    //printf("SD NumOperands: %u\n", patchableNode.getNumOperands());
     DAG.setRoot(patchableNode);
     setValue(&I, patchableNode);
     return;
