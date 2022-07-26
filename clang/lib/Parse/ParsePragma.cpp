@@ -610,6 +610,14 @@ void Parser::resetPragmaHandlers() {
   PP.RemovePragmaHandler("clang", LoopHintHandler.get());
   LoopHintHandler.reset();
 
+  PP.RemovePragmaHandler(BeginInstrumentHandler.get());
+  PP.RemovePragmaHandler("GCC", BeginInstrumentHandler.get());
+  BeginInstrumentHandler.reset();
+
+  PP.RemovePragmaHandler(EndInstrumentHandler.get());
+  PP.RemovePragmaHandler("GCC", EndInstrumentHandler.get());
+  EndInstrumentHandler.reset();
+
   PP.RemovePragmaHandler(UnrollHintHandler.get());
   PP.RemovePragmaHandler("GCC", UnrollHintHandler.get());
   UnrollHintHandler.reset();
