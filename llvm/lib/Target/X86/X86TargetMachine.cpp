@@ -90,6 +90,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeX86Target() {
   initializeX86OptimizeLEAPassPass(PR);
   initializeX86PartialReductionPass(PR);
   initializePseudoProbeInserterPass(PR);
+  initializeX86CustomPassPass(PR);
 }
 
 static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
@@ -600,6 +601,8 @@ void X86PassConfig::addPreEmitPass2() {
       return M->getFunction("objc_retainAutoreleasedReturnValue") ||
              M->getFunction("objc_unsafeClaimAutoreleasedReturnValue");
     }));
+  
+  addPass(createX86CustomPass());
 }
 
 bool X86PassConfig::addPostFastRegAllocRewrite() {
