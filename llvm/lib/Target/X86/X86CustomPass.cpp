@@ -1,3 +1,4 @@
+//Hayden Coffey
 #include "X86.h"
 #include "X86InstrInfo.h"
 
@@ -92,7 +93,6 @@ namespace {
         std::string split = " ";
         std::string token = tmp_str.substr(0, tmp_str.find(split));
 
-        size_t state = 0;
         size_t pos = 0;
 
         bool foundTag = false;
@@ -146,149 +146,84 @@ namespace {
                 outs() << MI << "\n";
 
                 ceID = getBBTag(MI);
-                outs() << "CE ID is " << ceID << "\n";
 
                 if (ceID != -1) {
+                    outs() << "CE ID is " << ceID << "\n";
                     idVec.push_back(ceID);
                     //MI.eraseFromParent();
                     //break;
                 }
             }
         }
-        // return ceID;
     }
 
-#if 0
-    void cleanMBB(MachineBasicBlock &MBB)
-    {
-        int ceID = -1;
-        for (auto &MI : MBB) {
-            while(
-                    if (MI.isInlineAsm()) {
-                    outs() << "V Found inline assembly V\n";
-                    outs() << MI << "\n";
+    char X86CustomPass::ID = 0;
 
-                    ceID = getBBTag(MI);
-                    outs() << "CE ID is " << ceID << "\n";
+    // TODO: Optimize how we update the log file so we are not reading/writing the
+    // whole thing each time
+    bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 
-                    if (ceID != -1) {
-                    idVec.push_back(ceID);
-                    }
-                    }
-                    }
-                    }
-#endif
+        std::string logFileName = "tool_file";
+        outs() << "In " << MF.getFunction().getName() << " Function\n";
 
-                    int updateCounts(MachineBasicBlock &MBB, const int ceID) {
+        //Read in CE profile count data
+        if (pdVec.empty()) {
+            outs() << "Reading logfile\n";
+            readLogFile(logFileName);
+        }
 
-                    bool init = false;
-                    // Using for(auto) leads to infinite loop repeating same basic block
-                    // for(MachineBasicBlock::iterator b = MBB.begin(), e = MBB.end(); b != e;
-                    // ++b)
-                    //{
-                    //   if (b->mayStore()) {
-                    //     pdVec[ceID].storeCount++;
-                    //     pdVec[ceID].memInst++;
-                    //   }
-                    //   if (b->mayLoad()) {
-                    //     pdVec[ceID].loadCount++;
-                    //     pdVec[ceID].memInst++;
-                    //   }
+        //Iterate over MBB
+        for (auto &MBB : MF) {
+            outs() << "V Parsing block V\n";
+            // outs() << MBB << "\n";
 
-                    //  if(b == MBB.begin() && init)
-                    //  {
-                    //    outs() << "Loop!\n";
-                    //    break;
-                    //  }
+            //If CE tags are present, update profile for CEs
+            std::vector<int> idVec;
+            parseMBB(MBB, idVec);
 
-                    //  init = true;
-                    //}
-                    for (auto &MI : MBB) {
-                        outs() << MI << "\n";
-                        if (MI.mayStore()) {
-                            pdVec[ceID].storeCount++;
-                            pdVec[ceID].memInst++;
+            if (!idVec.empty()) {
+                outs() << "Tags found. Updating counts...\n";
+                outs() << "Tags: ";
+                for(auto t : idVec)
+                {
+                    outs() << t << " ";
+                }
+                outs() << "\n";
+
+                bool init = false;
+                for (auto &MI : MBB) {
+                    //outs() << MI << "\n";
+                    if (MI.mayStore()) {
+                        for(auto ID : idVec)
+                        {
+                            pdVec[ID].storeCount++;
+                            pdVec[ID].memInst++;
                         }
-                        if (MI.mayLoad()) {
-                            pdVec[ceID].loadCount++;
-                            pdVec[ceID].memInst++;
-                        }
-
-                        if (MI == MBB.begin() && init) {
-                            outs() << "Loop!\n";
-                            break;
-                        }
-
-                        init = true;
                     }
+                    if (MI.mayLoad()) {
+                        for(auto ID : idVec)
+                        {
+                            pdVec[ID].loadCount++;
+                            pdVec[ID].memInst++;
+                        }
                     }
 
-                    char X86CustomPass::ID = 0;
-
-                    // bool init = false;
-
-                    // TODO: Optimize how we update the log file so we are not reading/writing the
-                    // whole thing each time
-                    bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
-
-                        std::string logFileName = "tool_file";
-                        outs() << "In " << MF.getFunction().getName() << " Function\n";
-
-                        if (pdVec.empty()) {
-                            outs() << "Reading logfile\n";
-                            readLogFile(logFileName);
-                        }
-
-                        // MachineRegisterInfo(*MF);
-
-                        int ceID;
-                        for (auto &MBB : MF) {
-                            // outs() << MBB << "\n";
-                            // const TargetInstrInfo *XII = MF.getSubtarget().getInstrInfo();
-                            // DebugLoc DL;
-                            std::vector<int> idVec;
-                            outs() << "Parsing block\n";
-                            parseMBB(MBB, idVec);
-
-                            if (!idVec.empty()) {
-                                outs() << "Updating counts\n";
-
-                                bool init = false;
-                                for (auto &MI : MBB) {
-                                    outs() << MI << "\n";
-                                    if (MI.mayStore()) {
-                                        for(auto ID : idVec)
-                                        {
-                                            pdVec[ID].storeCount++;
-                                            pdVec[ID].memInst++;
-                                        }
-                                    }
-                                    if (MI.mayLoad()) {
-                                        for(auto ID : idVec)
-                                        {
-                                            pdVec[ID].loadCount++;
-                                            pdVec[ID].memInst++;
-                                        }
-                                    }
-
-                                    if (MI == MBB.begin() && init) {
-                                        outs() << "Loop!\n";
-                                        break;
-                                    }
-
-                                    init = true;
-                                }
-
-                                // updateCounts(MBB, ceID);
-                                outs() << "Done\n";
-                            }
-                        }
-
-                        outs() << "Writing log file\n";
-                        writeLogFile(logFileName);
-                        // pdVec.clear();
-                        return false;
+                    if (MI == MBB.begin() && init) {
+                        outs() << "Loop!\n";
+                        break;
                     }
+
+                    init = true;
+                }
+
+                outs() << "Done\n";
+            }
+        }
+
+        outs() << "Writing log file\n";
+        writeLogFile(logFileName);
+        return false;
+    }
 } // namespace
 
 INITIALIZE_PASS(X86CustomPass, "X86-custompass",
@@ -297,83 +232,3 @@ INITIALIZE_PASS(X86CustomPass, "X86-custompass",
 namespace llvm {
     FunctionPass *createX86CustomPass() { return new X86CustomPass(); }
 } // namespace llvm
-
-#if 0
-for (auto &MI : MBB) {
-    if (MI.isInlineAsm()) {
-        outs() << "V Found inline assembly V\n";
-        outs() << MI << "\n";
-
-        ceID = getBBTag(MI);
-        outs() << "CE ID is " << ceID << "\n";
-
-        if (ceID != -1) {
-            MI.eraseFromParent();
-            break;
-        }
-    }
-
-#if 0
-    if(MI.getOpcode() == TargetOpcode::PATCHABLE_EVENT_CALL)
-    {
-        outs() << "V Found custom event V\n";
-        outs() << MI << "\n";
-        outs() << "Operands:\n";
-        for (const MachineOperand Op : MI.operands())
-        {
-            //getConstantVRegVal()
-            //getConstantVRegVal(Op.getImm());
-
-            //MachineRegisterInfo(*MF);
-            outs() << Op << "\n";
-            outs() << "Value is: " << *(size_t*)(Op.getImm()) << "\n";
-            outs() << "CI Value is: " << *(size_t*)(Op.getCImm()) << "\n";
-            outs() << "Global Value is: " << *(size_t*)(Op.getGlobal()) << "\n";
-            outs() << "Value is: " << (Op.getImm()) << "\n";
-            outs() << "CI Value is: " << (Op.getCImm()) << "\n";
-            outs() << "Global Value is: " << (Op.getGlobal()) << "\n";
-
-        }
-    }
-#endif
-
-    /*
-       if (MI.mayStore())
-       outs() << "Found Store\n";
-
-       if (MI.mayLoad()) {
-       outs() << "V Found Load V\n";
-       outs() << MI << "\n";
-       }
-       */
-
-    // MF.getTargetTriple();
-    // const auto &Triple = TM.getTargetTriple();
-    // if (Triple.getArch() != Triple::x86_64 || !Triple.isOSLinux())
-    // if ((Triple.getArch() != Triple::x86_64 && Triple.getArch() !=
-    // Triple::riscv64) || !Triple.isOSLinux()) return true; // don't do
-    // anything to this instruction.
-    // SmallVector<MachineOperand, 8> Ops;
-
-    // getRegForValue();
-    // Ops.push_back(MachineOperand::CreateReg(llvm::Register(0), true));
-    // Ops.push_back(MachineOperand::CreateReg(llvm::Register(0), true));
-    // Ops.push_back(MachineOperand::CreateReg(getRegForValue(0,false));
-    // Ops.push_back(MachineOperand::CreateReg(getRegForValue(I->getArgOperand(1)),
-    //										/*isDef=*/false));
-    // MachineInstrBuilder MIB =
-    //    BuildMI(MBB, MI, DL, XII->get(TargetOpcode::PATCHABLE_EVENT_CALL));
-    // for (auto &MO : Ops)
-    //  MIB.add(MO);
-
-    // BuildMI(MBB, MI, XII->get(X86::fun))
-
-    // if (MI.isReturn() && (MF.getName() == "count")) {
-    //   outs() << "Found Return\n";
-    //   // addi a0, a0, 2
-    //   BuildMI(MBB, MI, DL, XII->get(RISCV::ADDI), RISCV::X10)
-    //       .addReg(RISCV::X10)
-    //       .addImm(2);
-    // }
-}
-#endif
