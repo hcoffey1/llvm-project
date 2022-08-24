@@ -2,6 +2,13 @@
 #include "X86.h"
 #include "X86InstrInfo.h"
 
+//#include <llvm/Analysis/ScalarEvolutionExpressions.h>
+//#include <llvm/Analysis/ScalarEvolution.h>
+//#include <llvm/Analysis/PostDominators.h>
+
+//#include "llvm/CodeGen/MachineDominators.h"
+//#include "llvm/CodeGen/MachineLoopInfo.h"
+
 #include "llvm/CodeGen/FastISel.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -45,11 +52,26 @@ namespace {
             }
 
             bool runOnMachineFunction(MachineFunction &MF) override;
+            //virtual void getAnalysisUsage(AnalysisUsage &AU) const override;
 
             StringRef getPassName() const override {
                 return X86_MACHINEINSTR_CUSTOM_PASS_NAME;
             }
     };
+
+    //    void X86CustomPass::getAnalysisUsage(AnalysisUsage &AU) const
+    //{
+    //    // Specify we need the loopinfo pass to run before this pass
+    //    //AU.addRequired<MachineDominatorTree>();
+    //    //AU.addPreserved<MachineDominatorTree>();
+
+    //    //AU.addRequired<MachineLoopInfo>();
+    //    //AU.addPreserved<MachineLoopInfo>();
+
+    //    //AU.addRequired<LoopInfoWrapperPass>();
+    //    //AU.addRequired<ScalarEvolutionWrapperPass>();
+    //    //AU.addRequired<PostDominatorTreeWrapperPass>();
+    //}
 
     // Remove leading/trailing whitespace from string
     //  https://stackoverflow.com/questions/1798112/removing-leading-and-trailing-spaces-from-a-string
@@ -142,13 +164,14 @@ namespace {
         int ceID = -1;
         for (auto &MI : MBB) {
             if (MI.isInlineAsm()) {
-                outs() << "V Found inline assembly V\n";
-                outs() << MI << "\n";
+                //outs() << "V Found inline assembly V\n";
+                //outs() << MI << "\n";
 
                 ceID = getBBTag(MI);
 
                 if (ceID != -1) {
                     outs() << "CE ID is " << ceID << "\n";
+                    outs() << MI << "\n";
                     idVec.push_back(ceID);
                     //MI.eraseFromParent();
                     //break;
@@ -164,17 +187,17 @@ namespace {
     bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 
         std::string logFileName = "tool_file";
-        outs() << "In " << MF.getFunction().getName() << " Function\n";
+        //outs() << "In " << MF.getFunction().getName() << " Function\n";
 
         //Read in CE profile count data
         if (pdVec.empty()) {
-            outs() << "Reading logfile\n";
+            //outs() << "Reading logfile\n";
             readLogFile(logFileName);
         }
 
         //Iterate over MBB
         for (auto &MBB : MF) {
-            outs() << "V Parsing block V\n";
+            //outs() << "V Parsing block V\n";
             // outs() << MBB << "\n";
 
             //If CE tags are present, update profile for CEs
@@ -216,11 +239,11 @@ namespace {
                     init = true;
                 }
 
-                outs() << "Done\n";
+                //outs() << "Done\n";
             }
         }
 
-        outs() << "Writing log file\n";
+        //outs() << "Writing log file\n";
         writeLogFile(logFileName);
         return false;
     }
