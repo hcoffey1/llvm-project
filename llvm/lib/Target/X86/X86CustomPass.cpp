@@ -106,7 +106,13 @@ namespace {
         return result;
     }
 
-    int getBBTag(MachineInstr &MI) {
+    struct BBTag
+    {
+        int ceID;
+        size_t sf;
+    };
+
+    BBTag getBBTag(MachineInstr &MI) {
         std::string tmp_str;
         raw_string_ostream ss(tmp_str);
         ss << MI << "\n";
@@ -115,25 +121,36 @@ namespace {
         std::string split = " ";
         std::string token = tmp_str.substr(0, tmp_str.find(split));
 
+        BBTag bbtag;
+        bbtag.ceID = -1;
+        bbtag.sf = 0;
+        
         size_t pos = 0;
+        size_t state = 0;
 
-        bool foundTag = false;
         while ((pos = tmp_str.find(split)) != std::string::npos) {
             token = tmp_str.substr(0, pos);
-
-            if (foundTag) {
-                token.pop_back();
-                return atoi(token.c_str());
-            }
-
-            if (token.find("BB_TAG") != std::string::npos) {
-                foundTag = true;
+            switch(state)
+            {
+                case 0:
+                    if (token.find("BB_TAG") != std::string::npos) {
+                        state++;
+                    }
+                    break;
+                case 1:
+                    bbtag.ceID = atoi(token.c_str());
+                    state++;
+                    break;
+                case 2:
+                    bbtag.sf = atoi(token.c_str());
+                    return bbtag;
+                    break;
             }
 
             tmp_str.erase(0, pos + split.length());
         }
 
-        return -1;
+        return bbtag;
     }
 
     void readLogFile(std::string file) {
@@ -160,21 +177,15 @@ namespace {
         regionLogFile.close();
     }
 
-    void parseMBB(MachineBasicBlock &MBB, std::vector<int> &idVec) {
-        int ceID = -1;
+    void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
+        BBTag bbtag;
         for (auto &MI : MBB) {
             if (MI.isInlineAsm()) {
-                //outs() << "V Found inline assembly V\n";
-                //outs() << MI << "\n";
-
-                ceID = getBBTag(MI);
-
-                if (ceID != -1) {
-                    outs() << "CE ID is " << ceID << "\n";
+                bbtag = getBBTag(MI);
+                if (bbtag.ceID != -1) {
+                    outs() << "CE ID is " << bbtag.ceID << "\n";
                     outs() << MI << "\n";
-                    idVec.push_back(ceID);
-                    //MI.eraseFromParent();
-                    //break;
+                    idVec.push_back(bbtag);
                 }
             }
         }
@@ -201,15 +212,15 @@ namespace {
             // outs() << MBB << "\n";
 
             //If CE tags are present, update profile for CEs
-            std::vector<int> idVec;
-            parseMBB(MBB, idVec);
+            std::vector<BBTag> bbTagVec;
+            parseMBB(MBB, bbTagVec);
 
-            if (!idVec.empty()) {
+            if (!bbTagVec.empty()) {
                 outs() << "Tags found. Updating counts...\n";
                 outs() << "Tags: ";
-                for(auto t : idVec)
+                for(auto t : bbTagVec)
                 {
-                    outs() << t << " ";
+                    outs() << t.ceID << " " << t.sf << "\n";
                 }
                 outs() << "\n";
 
@@ -217,17 +228,17 @@ namespace {
                 for (auto &MI : MBB) {
                     //outs() << MI << "\n";
                     if (MI.mayStore()) {
-                        for(auto ID : idVec)
+                        for(auto ID : bbTagVec)
                         {
-                            pdVec[ID].storeCount++;
-                            pdVec[ID].memInst++;
+                            pdVec[ID.ceID].storeCount+=ID.sf;
+                            pdVec[ID.ceID].memInst+=ID.sf;
                         }
                     }
                     if (MI.mayLoad()) {
-                        for(auto ID : idVec)
+                        for(auto ID : bbTagVec)
                         {
-                            pdVec[ID].loadCount++;
-                            pdVec[ID].memInst++;
+                            pdVec[ID.ceID].loadCount+=ID.sf;
+                            pdVec[ID.ceID].memInst+=ID.sf;
                         }
                     }
 
@@ -238,12 +249,9 @@ namespace {
 
                     init = true;
                 }
-
-                //outs() << "Done\n";
             }
         }
 
-        //outs() << "Writing log file\n";
         writeLogFile(logFileName);
         return false;
     }
