@@ -27,6 +27,8 @@ namespace {
         uint64_t groupID;
         uint64_t storeCount;
         uint64_t loadCount;
+        uint64_t bytesRead;
+        uint64_t bytesWritten;
         uint64_t intInst;
         uint64_t fpInst;
         uint64_t termInst;
@@ -162,6 +164,8 @@ namespace {
             inProfile.memInst = 0;
             inProfile.loadCount = 0;
             inProfile.storeCount = 0;
+            inProfile.bytesRead = 0;
+            inProfile.bytesWritten = 0;
 
             pdVec.push_back(inProfile);
         }
@@ -226,19 +230,31 @@ namespace {
 
                 bool init = false;
                 for (auto &MI : MBB) {
-                    //outs() << MI << "\n";
+
                     if (MI.mayStore()) {
+                        size_t totalBytes = 0;
+                        for(auto mop : MI.memoperands())
+                        {
+                            totalBytes += mop->getSize();
+                        }
                         for(auto ID : bbTagVec)
                         {
                             pdVec[ID.ceID].storeCount+=ID.sf;
                             pdVec[ID.ceID].memInst+=ID.sf;
+                            pdVec[ID.ceID].bytesWritten+=(totalBytes*ID.sf);
                         }
                     }
                     if (MI.mayLoad()) {
+                        size_t totalBytes = 0;
+                        for(auto mop : MI.memoperands())
+                        {
+                            totalBytes += mop->getSize();
+                        }
                         for(auto ID : bbTagVec)
                         {
                             pdVec[ID.ceID].loadCount+=ID.sf;
                             pdVec[ID.ceID].memInst+=ID.sf;
+                            pdVec[ID.ceID].bytesRead+=(totalBytes*ID.sf);
                         }
                     }
 
