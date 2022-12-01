@@ -180,6 +180,60 @@ namespace {
         }
         regionLogFile.close();
     }
+/*
+    bool isToolFlag(std::string inst, std::string pragmaName)
+    {
+        using namespace std;
+        bool flag = false;
+        inst = reduce(inst);
+        string split = " ";
+        string token = inst.substr(0, inst.find(split));
+
+        size_t state = 0;
+
+        size_t pos = 0;
+        while ((pos = inst.find(split)) != std::string::npos)
+        {
+            token = inst.substr(0, pos);
+            switch (state)
+            {
+            case 0:
+                if (token == "asm")
+                    state++;
+                break;
+            //case 1:
+            //    if (token == "sideeffect")
+            //        state++;
+            //    else
+            //        return false;
+            //    break;
+            case 1:
+                if (token.find(pragmaName) != string::npos)
+                    return true;
+                else
+                    return false;
+                break;
+            }
+
+            inst.erase(0, pos + split.length());
+        }
+        return false;
+    }
+
+    void parseBB(BasicBlock &MBB, std::vector<BBTag> &idVec) {
+        BBTag bbtag;
+        for (auto &MI : MBB) {
+            if (MI.isInlineAsm()) {
+                bbtag = getBBTag(MI);
+                if (bbtag.ceID != -1) {
+                    outs() << "CE ID is " << bbtag.ceID << "\n";
+                    outs() << MI << "\n";
+                    idVec.push_back(bbtag);
+                }
+            }
+        }
+    }
+    */
 
     void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
         BBTag bbtag;
