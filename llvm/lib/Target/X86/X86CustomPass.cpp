@@ -255,7 +255,7 @@ char X86CustomPass::ID = 0;
 // whole thing each time
 bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 
-  std::string logFileName = "tool_file";
+  std::string logFileName = std::getenv("ZRAY_LOGFILE");
   // outs() << "In " << MF.getFunction().getName() << " Function\n";
 
   // Read in CE profile count data
