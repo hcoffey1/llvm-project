@@ -21,6 +21,14 @@ using namespace llvm;
 
 namespace {
 
+constexpr int checksum(const char *data, size_t length) {
+  int sum = 0;
+  for (size_t i = 0; i < length; i++) {
+    sum ^= data[i];
+  }
+  return sum;
+}
+
 struct ProfileData {
   uint64_t PostDomSetID;
   uint64_t PragmaRegionID;
@@ -44,6 +52,7 @@ struct ProfileData {
 };
 
 std::vector<ProfileData> pdVec;
+std::vector<std::string> funcNameVec;
 
 class X86CustomPass : public MachineFunctionPass {
 public:
@@ -157,7 +166,26 @@ void readLogFile(std::string file) {
   std::ifstream regionLogFile;
   regionLogFile.open(file, std::ios::binary);
   ProfileData inProfile;
+
+  size_t FunctionNameLen;
+  int InCheck;
+  int Check;
   while (regionLogFile.read((char *)&inProfile, sizeof(ProfileData))) {
+    // Read in and verify checksum
+    regionLogFile.read(reinterpret_cast<char *>(&InCheck), sizeof(InCheck));
+    Check = checksum((char *)&inProfile, sizeof(ProfileData));
+
+    if (Check != InCheck) {
+      errs() << "X86 MIR Pass: Checksum mismatch!\n";
+      errs() << InCheck << " " << Check << "\n";
+    }
+
+    regionLogFile.read(reinterpret_cast<char *>(&FunctionNameLen),
+                       sizeof(FunctionNameLen));
+
+    std::string FunctionName(FunctionNameLen, '\0');
+    regionLogFile.read(&FunctionName[0], FunctionNameLen);
+
     // Clear instruction types we will replace with MIR counts
     inProfile.MemInstructionCount = 0;
     inProfile.LoadCount = 0;
@@ -166,6 +194,7 @@ void readLogFile(std::string file) {
     inProfile.BytesWritten = 0;
 
     pdVec.push_back(inProfile);
+    funcNameVec.push_back(FunctionName);
   }
   regionLogFile.close();
 }
@@ -173,8 +202,21 @@ void readLogFile(std::string file) {
 void writeLogFile(std::string file) {
   std::ofstream regionLogFile;
   regionLogFile.open(file, std::ios::out | std::ios::binary);
-  for (auto pd : pdVec) {
-    regionLogFile.write((char *)(&pd), sizeof(ProfileData));
+  for (int i = 0; i < pdVec.size(); i++) {
+    regionLogFile.write((char *)(&pdVec[i]), sizeof(ProfileData));
+
+    // Write checksum
+    int Check = checksum(reinterpret_cast<const char *>(&pdVec[i]),
+                         sizeof(ProfileData));
+    regionLogFile.write(reinterpret_cast<const char *>(&Check), sizeof(Check));
+
+    // Write function name to log
+    std::string FunctionName = funcNameVec[i];
+    size_t FunctionNameLen = FunctionName.size();
+
+    regionLogFile.write(reinterpret_cast<const char *>(&FunctionNameLen),
+                        sizeof(FunctionNameLen));
+    regionLogFile.write(FunctionName.c_str(), FunctionNameLen);
   }
   regionLogFile.close();
 }
