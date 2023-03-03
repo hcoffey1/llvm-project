@@ -49,6 +49,7 @@ struct ProfileData {
   uint64_t HeapReadCount;
   uint64_t HeapWriteCount;
   uint64_t OtherInstCount;
+  bool IsIndirect;
 };
 
 std::vector<ProfileData> pdVec;
@@ -296,6 +297,11 @@ char X86CustomPass::ID = 0;
 // TODO: Optimize how we update the log file so we are not reading/writing the
 // whole thing each time
 bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
+
+  //Guard to catch empty functions passed in
+  if (MF.empty()) {
+    return false;
+  }
 
   std::string logFileName = std::getenv("ZRAY_LOGFILE");
   // outs() << "In " << MF.getFunction().getName() << " Function\n";
