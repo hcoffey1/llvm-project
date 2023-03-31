@@ -49,6 +49,8 @@ struct ProfileData {
   uint64_t HeapReadCount;
   uint64_t HeapWriteCount;
   uint64_t OtherInstCount;
+  uint64_t IntrinsicLoad;
+  uint64_t IntrinsicStore;
   bool IsIndirect;
 };
 
@@ -336,6 +338,39 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       bool init = false;
       for (auto &MI : MBB) {
 
+//        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC)
+//        {
+//            outs() << "G_INTRINSIC---------------------------\n";
+//            outs() << MI << "\n";
+//          if(MI.getIntrinsicID() == Intrinsic::memcpy)
+//          {
+//            outs() << "Found a memcpy in the IR!---------------------------\n";
+//          }
+//        }
+//        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS)
+//        {
+//            outs() << "G_INTRINSIC_W_SIDE_EFFECTS---------------------------\n";
+//            outs() << MI << "\n";
+//          if(MI.getIntrinsicID() == Intrinsic::memcpy)
+//          {
+//            outs() << "Found a memcpy in the IR!---------------------------\n";
+//          }
+//        }
+//        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC_LRINT)
+//        {
+//            outs() << "G_INTRINSIC_LRINT---------------------------\n";
+//            outs() << MI << "\n";
+//          if(MI.getIntrinsicID() == Intrinsic::memcpy)
+//          {
+//            outs() << "Found a memcpy in the IR!---------------------------\n";
+//          }
+//        }
+//        if(MI.isCall())
+//        {
+//          outs() << MI << "\n ^^opcode: " << MI.getOpcode() << "\n";
+//          outs() << MI.getIntrinsicID() << "\n";
+//        }
+//
         if (MI.mayStore()) {
           size_t totalBytes = 0;
           for (auto mop : MI.memoperands()) {
