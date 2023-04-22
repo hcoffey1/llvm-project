@@ -52,10 +52,13 @@ struct ProfileData {
   uint64_t IntrinsicLoad;
   uint64_t IntrinsicStore;
   bool IsIndirect;
+  bool EnableMIRPass;
 };
 
 std::vector<ProfileData> pdVec;
 std::vector<std::string> funcNameVec;
+
+bool FirstRun = true;
 
 class X86CustomPass : public MachineFunctionPass {
 public:
@@ -165,7 +168,7 @@ BBTag getBBTag(MachineInstr &MI) {
   return bbtag;
 }
 
-void readLogFile(std::string file) {
+bool readLogFile(std::string file) {
   std::ifstream regionLogFile;
   regionLogFile.open(file, std::ios::binary);
   ProfileData inProfile;
@@ -189,6 +192,12 @@ void readLogFile(std::string file) {
     std::string FunctionName(FunctionNameLen, '\0');
     regionLogFile.read(&FunctionName[0], FunctionNameLen);
 
+    if(!inProfile.EnableMIRPass)
+    {
+      regionLogFile.close();
+      return false;
+    }
+
     // Clear instruction types we will replace with MIR counts
     inProfile.MemInstructionCount = 0;
     inProfile.LoadCount = 0;
@@ -200,6 +209,8 @@ void readLogFile(std::string file) {
     funcNameVec.push_back(FunctionName);
   }
   regionLogFile.close();
+
+  return true;
 }
 
 void writeLogFile(std::string file) {
@@ -311,7 +322,18 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
   // Read in CE profile count data
   if (pdVec.empty()) {
     // outs() << "Reading logfile\n";
-    readLogFile(logFileName);
+    if(!readLogFile(logFileName))
+    {
+      return false;
+    }
+    else
+    {
+      if(FirstRun)
+      {
+        outs() << "ZRAY: Running MIR Pass...\n";
+        FirstRun = false;
+      }
+    }
   }
 
   // Iterate over MBB
