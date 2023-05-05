@@ -967,7 +967,7 @@ void CodeGenFunction::EmitBeginInstrumentStmt(const BeginInstrumentStmt &S){
 
   hc_asm_line += " " + std::to_string(S.getGroupID());
 
-  std::cout << "Line produces is : " << hc_asm_line << "\n";
+  std::cout << "zray_clang: Line produced is : " << hc_asm_line << "\n";
 
   // Create StringLiteral object from literal
   IdentifierInfo **Names;

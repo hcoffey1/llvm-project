@@ -3,7 +3,7 @@
 #include "X86InstrInfo.h"
 
 // #include <llvm/Analysis/ScalarEvolutionExpressions.h>
-// #include <llvm/Analysis/ScalarEvolution.h>
+//#include <llvm/Analysis/ScalarEvolution.h>
 // #include <llvm/Analysis/PostDominators.h>
 
 // #include "llvm/CodeGen/MachineDominators.h"
@@ -30,27 +30,27 @@ constexpr int checksum(const char *data, size_t length) {
 }
 
 struct ProfileData {
-  uint64_t PostDomSetID;
-  uint64_t PragmaRegionID;
-  uint64_t GroupNumber;
-  uint64_t StoreCount;
-  uint64_t LoadCount;
-  uint64_t BytesRead;
-  uint64_t BytesWritten;
-  uint64_t IntInstructionCount;
-  uint64_t FpInstructionCount;
-  uint64_t TermInstructionCount;
-  uint64_t MemInstructionCount;
-  uint64_t CastInstructionCount;
-  uint64_t GlobalOpReadCount;
-  uint64_t GlobalOpWriteCount;
-  uint64_t StackReadCount;
-  uint64_t StackWriteCount;
-  uint64_t HeapReadCount;
-  uint64_t HeapWriteCount;
-  uint64_t OtherInstCount;
-  uint64_t IntrinsicLoad;
-  uint64_t IntrinsicStore;
+  uint64_t PostDomSetID = 0;
+  uint64_t PragmaRegionID = 0;
+  uint64_t GroupNumber = 0;
+  uint64_t StoreCount = 0;
+  uint64_t LoadCount = 0;
+  uint64_t BytesRead = 0;
+  uint64_t BytesWritten = 0;
+  uint64_t IntInstructionCount = 0;
+  uint64_t FpInstructionCount = 0;
+  uint64_t TermInstructionCount = 0;
+  uint64_t MemInstructionCount = 0;
+  uint64_t CastInstructionCount = 0;
+  uint64_t GlobalOpReadCount = 0;
+  uint64_t GlobalOpWriteCount = 0;
+  uint64_t StackReadCount = 0;
+  uint64_t StackWriteCount = 0;
+  uint64_t HeapReadCount = 0;
+  uint64_t HeapWriteCount = 0;
+  uint64_t OtherInstCount = 0;
+  uint64_t IntrinsicLoad = 0;
+  uint64_t IntrinsicStore = 0;
   bool IsIndirect;
   bool EnableMIRPass;
 };
@@ -69,26 +69,28 @@ public:
   }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
-  // virtual void getAnalysisUsage(AnalysisUsage &AU) const override;
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
 
   StringRef getPassName() const override {
     return X86_MACHINEINSTR_CUSTOM_PASS_NAME;
   }
 };
 
-//    void X86CustomPass::getAnalysisUsage(AnalysisUsage &AU) const
-//{
-//    // Specify we need the loopinfo pass to run before this pass
-//    //AU.addRequired<MachineDominatorTree>();
-//    //AU.addPreserved<MachineDominatorTree>();
+void X86CustomPass::getAnalysisUsage(AnalysisUsage &AU) const
+{
+    MachineFunctionPass::getAnalysisUsage(AU);
+    //AU.addRequired<MachineLoopInfo>();
+    // Specify we need the loopinfo pass to run before this pass
+    //AU.addRequired<MachineDominatorTree>();
+    //AU.addPreserved<MachineDominatorTree>();
 
-//    //AU.addRequired<MachineLoopInfo>();
-//    //AU.addPreserved<MachineLoopInfo>();
+    //AU.addRequired<MachineLoopInfo>();
+    //AU.addPreserved<MachineLoopInfo>();
 
-//    //AU.addRequired<LoopInfoWrapperPass>();
-//    //AU.addRequired<ScalarEvolutionWrapperPass>();
-//    //AU.addRequired<PostDominatorTreeWrapperPass>();
-//}
+    //AU.addRequired<LoopInfoWrapperPass>();
+    //AU.addRequired<ScalarEvolutionWrapperPass>();
+    //AU.addRequired<PostDominatorTreeWrapperPass>();
+}
 
 // Remove leading/trailing whitespace from string
 //  https://stackoverflow.com/questions/1798112/removing-leading-and-trailing-spaces-from-a-string
@@ -326,13 +328,11 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
     {
       return false;
     }
-    else
+
+    if(FirstRun)
     {
-      if(FirstRun)
-      {
-        outs() << "ZRAY: Running MIR Pass...\n";
-        FirstRun = false;
-      }
+      outs() << "ZRAY: Running MIR Pass...\n";
+      FirstRun = false;
     }
   }
 
@@ -393,15 +393,24 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 //          outs() << MI.getIntrinsicID() << "\n";
 //        }
 //
+        if (MI.isInlineAsm())
+        {
+          continue;
+        }
+
+        //outs() << "MIR: bbTagVec Size: " << bbTagVec.size() << "\n";
+
         if (MI.mayStore()) {
           size_t totalBytes = 0;
           for (auto mop : MI.memoperands()) {
             totalBytes += mop->getSize();
           }
           for (auto ID : bbTagVec) {
+            //outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
             pdVec[ID.ceID].StoreCount += ID.sf;
             pdVec[ID.ceID].MemInstructionCount += ID.sf;
             pdVec[ID.ceID].BytesWritten += (totalBytes * ID.sf);
+            break;
           }
         }
         if (MI.mayLoad()) {
@@ -410,9 +419,11 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             totalBytes += mop->getSize();
           }
           for (auto ID : bbTagVec) {
+            //outs() << "MIR: Load ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
             pdVec[ID.ceID].LoadCount += ID.sf;
             pdVec[ID.ceID].MemInstructionCount += ID.sf;
             pdVec[ID.ceID].BytesRead += (totalBytes * ID.sf);
+            break;
           }
         }
 
