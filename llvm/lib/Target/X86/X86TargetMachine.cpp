@@ -91,6 +91,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeX86Target() {
   initializeX86PartialReductionPass(PR);
   initializePseudoProbeInserterPass(PR);
   initializeX86CustomPassPass(PR);
+  initializeX86CustomPassStaticMixCheckPass(PR);
 }
 
 static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
@@ -603,6 +604,7 @@ void X86PassConfig::addPreEmitPass2() {
     }));
   
   addPass(createX86CustomPass());
+  addPass(createX86CustomPassStaticMixCheck());
 }
 
 bool X86PassConfig::addPostFastRegAllocRewrite() {

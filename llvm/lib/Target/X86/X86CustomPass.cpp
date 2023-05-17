@@ -18,6 +18,7 @@
 using namespace llvm;
 
 #define X86_MACHINEINSTR_CUSTOM_PASS_NAME "Custom X86 pass"
+#define X86_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME "Custom X86 pass - static mix check"
 
 namespace {
 
@@ -129,6 +130,21 @@ struct BBTag {
   int ceID;
   size_t sf;
 };
+bool isCounter(MachineInstr &MI) {
+  std::string tmp_str;
+  raw_string_ostream ss(tmp_str);
+  ss << MI << "\n";
+
+  tmp_str = reduce(tmp_str, " ", " \t");
+  std::string split = " ";
+  std::string token = tmp_str.substr(0, tmp_str.find(split));
+
+  if (token.find("ZRAY_COUNTER_START") != std::string::npos) {
+    return true;
+  }
+
+  return false;
+}
 
 BBTag getBBTag(MachineInstr &MI) {
   std::string tmp_str;
@@ -357,18 +373,34 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
                 outs() << "\n";
 #endif
 
+      size_t loads = 0;
+      size_t bytes_read = 0;
+      size_t stores = 0;
+      size_t bytes_written = 0;
+      size_t counters = 0;
       bool init = false;
       for (auto &MI : MBB) {
 
-//        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC)
-//        {
-//            outs() << "G_INTRINSIC---------------------------\n";
-//            outs() << MI << "\n";
-//          if(MI.getIntrinsicID() == Intrinsic::memcpy)
-//          {
-//            outs() << "Found a memcpy in the IR!---------------------------\n";
-//          }
-//        }
+        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC)
+        {
+            outs() << "G_INTRINSIC---------------------------\n";
+            outs() << MI << "\n";
+          if(MI.mayLoadOrStore())
+          {
+            for (auto mop : MI.memoperands()) {
+              if(mop->isStore()){
+                outs() << "INTRINSIC_OP_STORE\n";
+              }
+              if(mop->isLoad()){
+                outs() << "INTRINSIC_OP_LOAD\n";
+              }
+            }
+          }
+          //if(MI.getIntrinsicID() == Intrinsic::memcpy)
+          //{
+          //  outs() << "Found a memcpy in the IR!---------------------------\n";
+          //}
+        }
 //        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS)
 //        {
 //            outs() << "G_INTRINSIC_W_SIDE_EFFECTS---------------------------\n";
@@ -393,39 +425,55 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 //          outs() << MI.getIntrinsicID() << "\n";
 //        }
 //
+        if (isCounter(MI))
+        {
+          counters++;
+        }
         if (MI.isInlineAsm())
         {
           continue;
         }
 
         //outs() << "MIR: bbTagVec Size: " << bbTagVec.size() << "\n";
+        if (MI.mayLoadOrStore()) {
+          for (auto mop : MI.memoperands()) {
+            if(mop->isStore()){
+              bytes_written += mop->getSize();
+              stores++;
+            }
+            if(mop->isLoad()){
+              bytes_read += mop->getSize();
+              loads++;
+            }
+          }
+        } 
 
-        if (MI.mayStore()) {
-          size_t totalBytes = 0;
-          for (auto mop : MI.memoperands()) {
-            totalBytes += mop->getSize();
-          }
-          for (auto ID : bbTagVec) {
-            //outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-            pdVec[ID.ceID].StoreCount += ID.sf;
-            pdVec[ID.ceID].MemInstructionCount += ID.sf;
-            pdVec[ID.ceID].BytesWritten += (totalBytes * ID.sf);
-            break;
-          }
-        }
-        if (MI.mayLoad()) {
-          size_t totalBytes = 0;
-          for (auto mop : MI.memoperands()) {
-            totalBytes += mop->getSize();
-          }
-          for (auto ID : bbTagVec) {
-            //outs() << "MIR: Load ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-            pdVec[ID.ceID].LoadCount += ID.sf;
-            pdVec[ID.ceID].MemInstructionCount += ID.sf;
-            pdVec[ID.ceID].BytesRead += (totalBytes * ID.sf);
-            break;
-          }
-        }
+        //if (MI.mayStore()) {
+        //  size_t totalBytes = 0;
+        //  for (auto mop : MI.memoperands()) {
+        //    totalBytes += mop->getSize();
+        //  }
+        //  for (auto ID : bbTagVec) {
+        //    //outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
+        //    pdVec[ID.ceID].StoreCount += ID.sf;
+        //    pdVec[ID.ceID].MemInstructionCount += ID.sf;
+        //    pdVec[ID.ceID].BytesWritten += (totalBytes * ID.sf);
+        //    break;
+        //  }
+        //}
+        //if (MI.mayLoad()) {
+        //  size_t totalBytes = 0;
+        //  for (auto mop : MI.memoperands()) {
+        //    totalBytes += mop->getSize();
+        //  }
+        //  for (auto ID : bbTagVec) {
+        //    //outs() << "MIR: Load ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
+        //    pdVec[ID.ceID].LoadCount += ID.sf;
+        //    pdVec[ID.ceID].MemInstructionCount += ID.sf;
+        //    pdVec[ID.ceID].BytesRead += (totalBytes * ID.sf);
+        //    break;
+        //  }
+        //}
 
         if (MI == MBB.begin() && init) {
           outs() << "Loop!\n";
@@ -434,17 +482,104 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 
         init = true;
       }
+
+      for (auto ID : bbTagVec) {
+        //outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
+        pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
+        pdVec[ID.ceID].LoadCount += (loads - 2*counters)*ID.sf;
+        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 3)*ID.sf;
+        pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
+        pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
+        //break;
+      }
     }
   }
 
   writeLogFile(logFileName);
   return false;
 }
+
+class X86CustomPassStaticMixCheck : public MachineFunctionPass {
+public:
+  static char ID;
+
+  X86CustomPassStaticMixCheck() : MachineFunctionPass(ID) {
+    initializeX86CustomPassStaticMixCheckPass(*PassRegistry::getPassRegistry());
+  }
+
+  bool runOnMachineFunction(MachineFunction &MF) override;
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
+
+  StringRef getPassName() const override {
+    return X86_MACHINEINSTR_CUSTOM_PASS_NAME;
+  }
+};
+
+char X86CustomPassStaticMixCheck::ID = 0;
+
+void X86CustomPassStaticMixCheck::getAnalysisUsage(AnalysisUsage &AU) const
+{
+    MachineFunctionPass::getAnalysisUsage(AU);
+}
+
+ProfileData StaticMixAppInfo;
+size_t BasicBlockCountApp = 0;
+
+void writeStaticMixInfo(MachineFunction &MF, const ProfileData &Prof, size_t BBCount)
+{
+    std::ofstream LogFile;
+    LogFile.open("./StaticMixInfo.log", std::ios::out | std::ios::app);
+
+    LogFile << "Function: " << MF.getName().str() << "\n";
+    LogFile << "Loads      : " << Prof.LoadCount << "\n";
+    LogFile << "Stores     : " << Prof.StoreCount << "\n";
+    LogFile << "BasicBlocks: " << BBCount << "\n";
+    LogFile << "Total\n";
+    LogFile << "Loads      : " << StaticMixAppInfo.LoadCount << "\n";
+    LogFile << "Stores     : " << StaticMixAppInfo.StoreCount << "\n";
+    LogFile << "BasicBlocks: " << BasicBlockCountApp << "\n";
+
+    LogFile.close();
+}
+
+bool X86CustomPassStaticMixCheck::runOnMachineFunction(MachineFunction &MF) {
+
+  ProfileData StaticMixFuncInfo;
+  size_t BasicBlockCountFunc = 0;
+  for (auto &MBB : MF) {
+    for (auto &MI : MBB) {
+
+        if (MI.isInlineAsm())
+        {
+          continue;
+        }
+        if (MI.mayLoad()) {
+          StaticMixAppInfo.LoadCount+=1;
+          StaticMixFuncInfo.LoadCount+=1;
+        }
+        if (MI.mayStore()) {
+          StaticMixAppInfo.StoreCount+=1;
+          StaticMixFuncInfo.StoreCount+=1;
+        }
+    }
+    BasicBlockCountFunc++;
+    BasicBlockCountApp++;
+  }
+
+  writeStaticMixInfo(MF, StaticMixFuncInfo, BasicBlockCountFunc);
+
+  return false;
+}
+
 } // namespace
 
 INITIALIZE_PASS(X86CustomPass, "X86-custompass",
                 X86_MACHINEINSTR_CUSTOM_PASS_NAME, true, true)
 
+INITIALIZE_PASS(X86CustomPassStaticMixCheck, "X86-custompass-staticmixcheck",
+                X86_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME, true, true)
+
 namespace llvm {
 FunctionPass *createX86CustomPass() { return new X86CustomPass(); }
+FunctionPass *createX86CustomPassStaticMixCheck() { return new X86CustomPassStaticMixCheck(); }
 } // namespace llvm

@@ -147,6 +147,12 @@ FunctionPass *createX86PartialReductionPass();
 
 FunctionPass *createX86CustomPass();
 void initializeX86CustomPassPass(PassRegistry &);
+
+FunctionPass *createX86CustomPassStaticMixCheck();
+void initializeX86CustomPassStaticMixCheckPass(PassRegistry &);
+
+//FunctionPass *createX86CustomPassMIRBlockPass();
+//void initializeX86CustomPassMIRBlockPass(PassRegistry &);
      
 
 InstructionSelector *createX86InstructionSelector(const X86TargetMachine &TM,
