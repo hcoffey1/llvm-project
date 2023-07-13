@@ -137,9 +137,18 @@ bool isCounter(MachineInstr &MI) {
 
   tmp_str = reduce(tmp_str, " ", " \t");
   std::string split = " ";
-  std::string token = tmp_str.substr(0, tmp_str.find(split));
+  // outs() << tmp_str << "\n";
+  // outs() << tmp_str.find(split) << "\n";
+  size_t start = (tmp_str.find(split)) + 1;
+  size_t end = tmp_str.find(split, start);
+  // std::string token = tmp_str.substr(0, tmp_str.find(split));
+  std::string token = tmp_str.substr(start, end);
+  // outs() << tmp_str << "\n";
+  // outs() << start << split << end << split << token << "\n";
 
+  // if (tmp_str.find("ZRAY_COUNTER_END") != std::string::npos) {
   if (token.find("ZRAY_COUNTER_START") != std::string::npos) {
+    // outs() << "Found a counter" << "\n";
     return true;
   }
 
@@ -324,6 +333,8 @@ void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
 }
 
 char X86CustomPass::ID = 0;
+// uint64_t totalLoadCount = 0;
+// uint64_t totalStoreCount = 0;
 
 // TODO: Optimize how we update the log file so we are not reading/writing the
 // whole thing each time
@@ -333,6 +344,8 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
   if (MF.empty()) {
     return false;
   }
+  // uint64_t functionLoadCount = 0;
+  // uint64_t functionStoreCount = 0;
 
   std::string logFileName = std::getenv("ZRAY_LOGFILE");
   // outs() << "In " << MF.getFunction().getName() << " Function\n";
@@ -380,6 +393,8 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       size_t counters = 0;
       bool init = false;
       for (auto &MI : MBB) {
+
+        if(MI.isDebugInstr()) continue;
 
         if(MI.getOpcode() == TargetOpcode::G_INTRINSIC)
         {
@@ -446,6 +461,11 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
               loads++;
             }
           }
+	  // if(bbTagVec.back().ceID == 228) {
+	    // MI.print(outs());
+	    // outs() << "L: " << loads << " S: " << stores << "\n";
+	    // MI.dumpr();
+	  // }
         } 
 
         //if (MI.mayStore()) {
@@ -484,16 +504,41 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       }
 
       for (auto ID : bbTagVec) {
-        //outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
+        // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
+        // outs() << "MIR: PostDomSetID before: " << pdVec[ID.ceID].PostDomSetID << "\n";
+        // outs() << "MIR: StoreCount before: " << pdVec[ID.ceID].StoreCount << "\n";
+        // outs() << "MIR: LoadCount before: " << pdVec[ID.ceID].LoadCount << "\n";
+	    // outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
+        // outs() << "Recorded loads " << (loads - 3*counters)*ID.sf << "\n";
+        // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
+	    // if ((counters > loads) || (counters > stores)) {
+          // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
+          // outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
+	    //   outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
+        //   outs() << "Recorded loads " << (loads - 3*counters)*ID.sf << "\n";
+        //   outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
+	    // }
         pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
-        pdVec[ID.ceID].LoadCount += (loads - 2*counters)*ID.sf;
-        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 3)*ID.sf;
+        pdVec[ID.ceID].LoadCount += (loads - 3*counters)*ID.sf;
+	    // functionStoreCount += (stores - counters)*ID.sf;
+	    // functionLoadCount += (loads - 3*counters)*ID.sf;
+	    // totalStoreCount += (stores - counters)*ID.sf;
+	    // totalLoadCount += (loads - 3*counters)*ID.sf;
+        // outs() << "MIR: " << "ID " << ID.ceID << " StoreCount after: " << pdVec[ID.ceID].StoreCount << "\n";
+        // outs() << "MIR: " << "ID " << ID.ceID << " LoadCount after: " << pdVec[ID.ceID].LoadCount << "\n";
+        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 4)*ID.sf;
         pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
         pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
         //break;
       }
     }
   }
+  // outs() << "Function: " << MF.getName().str() << "\n";
+  // outs() << "Loads      : " << functionLoadCount << "\n";
+  // outs() << "Stores     : " << functionStoreCount << "\n";
+  // outs() << "Total:\n";
+  // outs() << "Loads      : " << totalLoadCount << "\n";
+  // outs() << "Stores     : " << totalStoreCount << "\n";
 
   writeLogFile(logFileName);
   return false;
