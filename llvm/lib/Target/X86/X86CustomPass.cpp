@@ -452,6 +452,16 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
         //outs() << "MIR: bbTagVec Size: " << bbTagVec.size() << "\n";
         if (MI.mayLoadOrStore()) {
           for (auto mop : MI.memoperands()) {
+            std::string tmp_str;
+            raw_string_ostream ss(tmp_str);
+            ss << MI << "\n";
+            tmp_str = reduce(tmp_str, " ", " \t");
+            // Check for CounterArray or CounterArrayRegionOffset in MI
+            // If present, do not increment
+            // We still miss one extra load and store, so subtract those at the end
+            if (tmp_str.find("CounterArray") != std::string::npos) {
+                continue;
+            }
             if(mop->isStore()){
               bytes_written += mop->getSize();
               stores++;
@@ -509,24 +519,24 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
         // outs() << "MIR: StoreCount before: " << pdVec[ID.ceID].StoreCount << "\n";
         // outs() << "MIR: LoadCount before: " << pdVec[ID.ceID].LoadCount << "\n";
 	    // outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
-        // outs() << "Recorded loads " << (loads - 3*counters)*ID.sf << "\n";
+        // outs() << "Recorded loads " << (loads - counters)*ID.sf << "\n";
         // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
 	    // if ((counters > loads) || (counters > stores)) {
           // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
           // outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
 	    //   outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
-        //   outs() << "Recorded loads " << (loads - 3*counters)*ID.sf << "\n";
+        //   outs() << "Recorded loads " << (loads - counters)*ID.sf << "\n";
         //   outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
 	    // }
         pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
-        pdVec[ID.ceID].LoadCount += (loads - 3*counters)*ID.sf;
+        pdVec[ID.ceID].LoadCount += (loads - counters)*ID.sf;
 	    // functionStoreCount += (stores - counters)*ID.sf;
-	    // functionLoadCount += (loads - 3*counters)*ID.sf;
+	    // functionLoadCount += (loads - counters)*ID.sf;
 	    // totalStoreCount += (stores - counters)*ID.sf;
-	    // totalLoadCount += (loads - 3*counters)*ID.sf;
+	    // totalLoadCount += (loads - counters)*ID.sf;
         // outs() << "MIR: " << "ID " << ID.ceID << " StoreCount after: " << pdVec[ID.ceID].StoreCount << "\n";
         // outs() << "MIR: " << "ID " << ID.ceID << " LoadCount after: " << pdVec[ID.ceID].LoadCount << "\n";
-        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 4)*ID.sf;
+        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 2)*ID.sf;
         pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
         pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
         //break;
