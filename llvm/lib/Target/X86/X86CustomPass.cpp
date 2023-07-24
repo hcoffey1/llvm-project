@@ -135,20 +135,50 @@ bool isCounter(MachineInstr &MI) {
   raw_string_ostream ss(tmp_str);
   ss << MI << "\n";
 
-  tmp_str = reduce(tmp_str, " ", " \t");
-  std::string split = " ";
+  // tmp_str = reduce(tmp_str, " ", " \t");
+  // std::string split = " ";
   // outs() << tmp_str << "\n";
   // outs() << tmp_str.find(split) << "\n";
-  size_t start = (tmp_str.find(split)) + 1;
-  size_t end = tmp_str.find(split, start);
+  // size_t start = (tmp_str.find(split)) + 1;
+  // size_t end = tmp_str.find(split, start);
   // std::string token = tmp_str.substr(0, tmp_str.find(split));
-  std::string token = tmp_str.substr(start, end);
+
+  // Use hardcodings based on current MIR InlineASM format
+  // INLINEASM &"#ZRAY_COUNTER_START" ...
   // outs() << tmp_str << "\n";
   // outs() << start << split << end << split << token << "\n";
 
+  if (tmp_str.size() != 60) {
+      return false;
+  }
+  std::string token = tmp_str.substr(13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
   // if (tmp_str.find("ZRAY_COUNTER_END") != std::string::npos) {
   if (token.find("ZRAY_COUNTER_START") != std::string::npos) {
     // outs() << "Found a counter" << "\n";
+    return true;
+  }
+
+  return false;
+}
+
+bool bbHasCounter(MachineInstr &MI) {
+  std::string tmp_str;
+  raw_string_ostream ss(tmp_str);
+  ss << MI << "\n";
+
+  // tmp_str = reduce(tmp_str, " ", " \t");
+  // std::string split = " ";
+  // size_t start = (tmp_str.find(split)) + 1;
+  // size_t end = tmp_str.find(split, start);
+
+  // Use hardcodings based on current MIR InlineASM format
+  // INLINEASM &"#BB_HAS_ZRAY_COUNTER" ...
+  if (tmp_str.size() != 61) {
+      return false;
+  }
+  std::string token = tmp_str.substr(13 /* Starting index */, 19 /* length */);
+  if (token.find("BB_HAS_ZRAY_COUNTER") != std::string::npos) {
+    // outs() << "Found end marker" << "\n";
     return true;
   }
 
@@ -316,8 +346,14 @@ void writeLogFile(std::string file) {
     }
     */
 
+// Global variable to store last BBTag, in case block is split
+BBTag lastbbtag;
+// Global variable to detect whether BBTag was recently recorded
+long recentBBFlag;
+
 void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
   BBTag bbtag;
+  bool has_counter = false;
   for (auto &MI : MBB) {
     if (MI.isInlineAsm()) {
       bbtag = getBBTag(MI);
@@ -327,8 +363,28 @@ void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
         outs() << MI << "\n";
 #endif
         idVec.push_back(bbtag);
+        lastbbtag = bbtag;
+        recentBBFlag = 3;
       }
     }
+  }
+  if((recentBBFlag > 0) && idVec.empty()) {
+    int inst_count = 0;
+    // This will help us filter out blocks which may have resulted from a split
+    --recentBBFlag;
+    // Look for ending marker
+    for (MachineBasicBlock::reverse_iterator I = MBB.rbegin(); I != MBB.rend(); I++) {
+        if ((*I).isInlineAsm()) {
+            has_counter |= bbHasCounter(*I);
+        }
+        // Ugly hack to prevent spending too much time looking for ending
+        // marker, since it should be very close to the end, x86_64 has 68 registers
+        ++inst_count;
+        if(inst_count >= 20) {
+            break;
+        }
+    }
+    if(has_counter) idVec.push_back(lastbbtag);
   }
 }
 
@@ -365,6 +421,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
     }
   }
 
+  // outs() << "MF: " << MF.getName() << "\n";
   // Iterate over MBB
   for (auto &MBB : MF) {
     // outs() << "V Parsing block V\n";
@@ -373,6 +430,10 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
     // If CE tags are present, update profile for CEs
     std::vector<BBTag> bbTagVec;
     parseMBB(MBB, bbTagVec);
+    // outs() << "MBB: " << MBB.getName() << "\n";
+    // for (auto &MI : MBB) {
+    //     outs() << "MI: " << MI << "\n";
+    // }
 
     if (!bbTagVec.empty()) {
 
@@ -457,11 +518,11 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             ss << MI << "\n";
             tmp_str = reduce(tmp_str, " ", " \t");
             // Check for CounterArray or CounterArrayRegionOffset in MI
-            // If present, do not increment
+            // If present, do not increment (IGNORING FOR PERFORMANCE)
             // We still miss one extra load and store, so subtract those at the end
-            if (tmp_str.find("CounterArray") != std::string::npos) {
-                continue;
-            }
+            // if (tmp_str.find("CounterArray") != std::string::npos) {
+            //     continue;
+            // }
             if(mop->isStore()){
               bytes_written += mop->getSize();
               stores++;
@@ -519,24 +580,24 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
         // outs() << "MIR: StoreCount before: " << pdVec[ID.ceID].StoreCount << "\n";
         // outs() << "MIR: LoadCount before: " << pdVec[ID.ceID].LoadCount << "\n";
 	    // outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
-        // outs() << "Recorded loads " << (loads - counters)*ID.sf << "\n";
+        // outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
         // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
 	    // if ((counters > loads) || (counters > stores)) {
           // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
           // outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
 	    //   outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
-        //   outs() << "Recorded loads " << (loads - counters)*ID.sf << "\n";
+        //   outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
         //   outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
 	    // }
         pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
-        pdVec[ID.ceID].LoadCount += (loads - counters)*ID.sf;
+        pdVec[ID.ceID].LoadCount += (loads - 3 * counters)*ID.sf;
 	    // functionStoreCount += (stores - counters)*ID.sf;
-	    // functionLoadCount += (loads - counters)*ID.sf;
+	    // functionLoadCount += (loads - 3 * counters)*ID.sf;
 	    // totalStoreCount += (stores - counters)*ID.sf;
-	    // totalLoadCount += (loads - counters)*ID.sf;
+	    // totalLoadCount += (loads - 3 * counters)*ID.sf;
         // outs() << "MIR: " << "ID " << ID.ceID << " StoreCount after: " << pdVec[ID.ceID].StoreCount << "\n";
         // outs() << "MIR: " << "ID " << ID.ceID << " LoadCount after: " << pdVec[ID.ceID].LoadCount << "\n";
-        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 2)*ID.sf;
+        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 4)*ID.sf;
         pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
         pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
         //break;
