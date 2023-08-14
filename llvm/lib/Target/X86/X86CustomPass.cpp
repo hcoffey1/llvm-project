@@ -422,6 +422,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
   }
 
   // outs() << "MF: " << MF.getName() << "\n";
+
   // Iterate over MBB
   for (auto &MBB : MF) {
     // outs() << "V Parsing block V\n";
@@ -430,6 +431,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
     // If CE tags are present, update profile for CEs
     std::vector<BBTag> bbTagVec;
     parseMBB(MBB, bbTagVec);
+
     // outs() << "MBB: " << MBB.getName() << "\n";
     // for (auto &MI : MBB) {
     //     outs() << "MI: " << MI << "\n";
@@ -453,9 +455,18 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       size_t bytes_written = 0;
       size_t counters = 0;
       bool init = false;
+      // outs() << "MBB: " << MBB.getName() << "\n";
       for (auto &MI : MBB) {
 
+        if (MI == MBB.begin() && init) {
+          outs() << "Loop!\n";
+          break;
+        }
+
+        init = true;
+
         if(MI.isDebugInstr()) continue;
+        // outs() << "MI: " << MI << "\n";
 
         if(MI.getOpcode() == TargetOpcode::G_INTRINSIC)
         {
@@ -472,41 +483,17 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
               }
             }
           }
-          //if(MI.getIntrinsicID() == Intrinsic::memcpy)
-          //{
-          //  outs() << "Found a memcpy in the IR!---------------------------\n";
-          //}
         }
-//        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC_W_SIDE_EFFECTS)
-//        {
-//            outs() << "G_INTRINSIC_W_SIDE_EFFECTS---------------------------\n";
-//            outs() << MI << "\n";
-//          if(MI.getIntrinsicID() == Intrinsic::memcpy)
-//          {
-//            outs() << "Found a memcpy in the IR!---------------------------\n";
-//          }
-//        }
-//        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC_LRINT)
-//        {
-//            outs() << "G_INTRINSIC_LRINT---------------------------\n";
-//            outs() << MI << "\n";
-//          if(MI.getIntrinsicID() == Intrinsic::memcpy)
-//          {
-//            outs() << "Found a memcpy in the IR!---------------------------\n";
-//          }
-//        }
-//        if(MI.isCall())
-//        {
-//          outs() << MI << "\n ^^opcode: " << MI.getOpcode() << "\n";
-//          outs() << MI.getIntrinsicID() << "\n";
-//        }
-//
-        if (isCounter(MI))
-        {
-          counters++;
+        if(!MI.mayLoadOrStore() && !MI.isCall() && !MI.isReturn() && !MI.isInlineAsm()) {
+          continue;
         }
+
         if (MI.isInlineAsm())
         {
+          if (isCounter(MI))
+          {
+            counters++;
+          }
           continue;
         }
 
@@ -518,12 +505,13 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             ss << MI << "\n";
             tmp_str = reduce(tmp_str, " ", " \t");
             // Check for CounterArray or CounterArrayRegionOffset in MI
-            // If present, do not increment (IGNORING FOR PERFORMANCE)
+            // If present, do not increment
             // We still miss one extra load and store, so subtract those at the end
-            // if (tmp_str.find("CounterArray") != std::string::npos) {
-            //     continue;
-            // }
+            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("on_thread_exit") != std::string::npos)) {
+                continue;
+            }
             if(mop->isStore()){
+              // outs() << "MI: " << MI << "\n";
               bytes_written += mop->getSize();
               stores++;
             }
@@ -538,69 +526,40 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 	    // MI.dumpr();
 	  // }
         } 
-
-        //if (MI.mayStore()) {
-        //  size_t totalBytes = 0;
-        //  for (auto mop : MI.memoperands()) {
-        //    totalBytes += mop->getSize();
-        //  }
-        //  for (auto ID : bbTagVec) {
-        //    //outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-        //    pdVec[ID.ceID].StoreCount += ID.sf;
-        //    pdVec[ID.ceID].MemInstructionCount += ID.sf;
-        //    pdVec[ID.ceID].BytesWritten += (totalBytes * ID.sf);
-        //    break;
-        //  }
-        //}
-        //if (MI.mayLoad()) {
-        //  size_t totalBytes = 0;
-        //  for (auto mop : MI.memoperands()) {
-        //    totalBytes += mop->getSize();
-        //  }
-        //  for (auto ID : bbTagVec) {
-        //    //outs() << "MIR: Load ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-        //    pdVec[ID.ceID].LoadCount += ID.sf;
-        //    pdVec[ID.ceID].MemInstructionCount += ID.sf;
-        //    pdVec[ID.ceID].BytesRead += (totalBytes * ID.sf);
-        //    break;
-        //  }
-        //}
-
-        if (MI == MBB.begin() && init) {
-          outs() << "Loop!\n";
-          break;
+        // X86 pushes/pops the return address to/from stack on call/return
+        if((MI.isCall() && (MI.getOpcode() != TargetOpcode::PATCHABLE_EVENT_CALL))/* || (MI.getOpcode() == X86::PUSH64r)*/) {
+          // outs() << "MI: " << MI << "\n";
+          bytes_written += 8;
+          stores++;
         }
-
-        init = true;
+        if((MI.isReturn() && (MI.getOpcode() != TargetOpcode::PATCHABLE_RET))/* || (MI.getOpcode() == X86::POP64r)*/) {
+          bytes_read += 8;
+          loads++;
+        }
       }
 
       for (auto ID : bbTagVec) {
         // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-        // outs() << "MIR: PostDomSetID before: " << pdVec[ID.ceID].PostDomSetID << "\n";
-        // outs() << "MIR: StoreCount before: " << pdVec[ID.ceID].StoreCount << "\n";
-        // outs() << "MIR: LoadCount before: " << pdVec[ID.ceID].LoadCount << "\n";
-	    // outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
+        // outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
+        // outs() << "Observed loads: " << loads << ", bytes read: " << bytes_read << ", stores: " << stores << ", bytes written: " << bytes_written << ", counters: " << counters << "\n";
         // outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
         // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
-	    // if ((counters > loads) || (counters > stores)) {
-          // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-          // outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
-	    //   outs() << "Calculated loads: " << loads << ", stores: " << stores << ", counters: " << counters << "\n";
-        //   outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
-        //   outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
-	    // }
-        pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
-        pdVec[ID.ceID].LoadCount += (loads - 3 * counters)*ID.sf;
+        if (counters  < loads) {
+            pdVec[ID.ceID].LoadCount += (loads - counters)*ID.sf;
+            pdVec[ID.ceID].MemInstructionCount += (loads - counters)*ID.sf;
+        }
+        if (counters < stores) {
+            pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
+            pdVec[ID.ceID].MemInstructionCount += (stores - counters)*ID.sf;
+        }
 	    // functionStoreCount += (stores - counters)*ID.sf;
 	    // functionLoadCount += (loads - 3 * counters)*ID.sf;
 	    // totalStoreCount += (stores - counters)*ID.sf;
 	    // totalLoadCount += (loads - 3 * counters)*ID.sf;
         // outs() << "MIR: " << "ID " << ID.ceID << " StoreCount after: " << pdVec[ID.ceID].StoreCount << "\n";
         // outs() << "MIR: " << "ID " << ID.ceID << " LoadCount after: " << pdVec[ID.ceID].LoadCount << "\n";
-        pdVec[ID.ceID].MemInstructionCount += (stores+loads - counters * 4)*ID.sf;
         pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
         pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
-        //break;
       }
     }
   }
