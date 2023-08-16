@@ -365,6 +365,7 @@ void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
         idVec.push_back(bbtag);
         lastbbtag = bbtag;
         recentBBFlag = 3;
+        // FIXME: Shouldn't we have a break statement here?
       }
     }
   }
@@ -507,7 +508,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             // Check for CounterArray or CounterArrayRegionOffset in MI
             // If present, do not increment
             // We still miss one extra load and store, so subtract those at the end
-            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("on_thread_exit") != std::string::npos)) {
+            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("on_thread_exit") != std::string::npos) /* FIXME: May not be correct - does this check have to be done with calls? If not and it works here, are we double counting calls? That can't be, seeing the accuracy of gapbs without considering calls */) {
                 continue;
             }
             if(mop->isStore()){
