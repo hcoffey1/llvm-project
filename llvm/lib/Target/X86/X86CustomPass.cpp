@@ -512,39 +512,43 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
                 continue;
             }
             if(mop->isStore()){
-              // outs() << "MI: " << MI << "\n";
+              // outs() << "Store MI: " << MI << "\n";
               bytes_written += mop->getSize();
               stores++;
             }
             if(mop->isLoad()){
+              // outs() << "Load MI: " << MI << "\n";
               bytes_read += mop->getSize();
               loads++;
             }
           }
-	  // if(bbTagVec.back().ceID == 228) {
-	    // MI.print(outs());
-	    // outs() << "L: " << loads << " S: " << stores << "\n";
-	    // MI.dumpr();
-	  // }
         } 
         // X86 pushes/pops the return address to/from stack on call/return
         if((MI.isCall() && (MI.getOpcode() != TargetOpcode::PATCHABLE_EVENT_CALL)) || (MI.getOpcode() == X86::PUSH64r)) {
-          // outs() << "MI: " << MI << "\n";
+          // outs() << "Call/Push MI: " << MI << "\n";
           std::string tmp_str;
           raw_string_ostream ss(tmp_str);
           ss << MI << "\n";
           tmp_str = reduce(tmp_str, " ", " \t");
           if (tmp_str.find("on_thread_exit") != std::string::npos) {
-                continue;
+            bytes_written -= 40;
+            stores -= 5;
+            bytes_read -= 40;
+            loads -= 5;
+            continue;
           }
           bytes_written += 8;
           stores++;
         }
         if((MI.isReturn() && (MI.getOpcode() != TargetOpcode::PATCHABLE_RET)) || (MI.getOpcode() == X86::POP64r)) {
-          // outs() << "MI: " << MI << "\n";
+          // outs() << "Ret/Pop MI: " << MI << "\n";
           bytes_read += 8;
           loads++;
         }
+        // if(bbTagVec.back().ceID == 4) {
+        //   outs() << MI << "\n";
+        //   outs() << "L: " << loads << " S: " << stores << "\n";
+        // }
       }
 
       for (auto ID : bbTagVec) {
