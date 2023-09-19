@@ -531,10 +531,10 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           ss << MI << "\n";
           tmp_str = reduce(tmp_str, " ", " \t");
           if (tmp_str.find("on_thread_exit") != std::string::npos) {
-            bytes_written -= 40;
-            stores -= 5;
-            bytes_read -= 40;
-            loads -= 5;
+            // bytes_written -= 40;
+            // stores -= 5;
+            // bytes_read -= 40;
+            // loads -= 5;
             continue;
           }
           bytes_written += 8;
