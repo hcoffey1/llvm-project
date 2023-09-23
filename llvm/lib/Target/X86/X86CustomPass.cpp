@@ -438,6 +438,9 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
     //     outs() << "MI: " << MI << "\n";
     // }
 
+    // Track number of frame-setup pushes before thread_exit
+    int num_frame_setup_push = 0;
+
     if (!bbTagVec.empty()) {
 
 #if 0
@@ -525,22 +528,35 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
         } 
         // X86 pushes/pops the return address to/from stack on call/return
         if((MI.isCall() && (MI.getOpcode() != TargetOpcode::PATCHABLE_EVENT_CALL)) || (MI.getOpcode() == X86::PUSH64r)) {
-          // outs() << "Call/Push MI: " << MI << "\n";
           std::string tmp_str;
           raw_string_ostream ss(tmp_str);
           ss << MI << "\n";
           tmp_str = reduce(tmp_str, " ", " \t");
           if (tmp_str.find("on_thread_exit") != std::string::npos) {
-            // bytes_written -= 40;
-            // stores -= 5;
-            // bytes_read -= 40;
-            // loads -= 5;
+            bytes_written -= 8 * num_frame_setup_push;
+            stores -= num_frame_setup_push;
+            bytes_read -= 8 * num_frame_setup_push;
+            loads -= num_frame_setup_push;
             continue;
           }
+          if ((MI.getOpcode() == X86::PUSH64r) && (tmp_str.substr(0, 11).find("frame-setup") != std::string::npos)) {
+              ++num_frame_setup_push;
+            // continue;
+          }
+          // outs() << "Call/Push MI: " << MI << "\n";
           bytes_written += 8;
           stores++;
         }
         if((MI.isReturn() && (MI.getOpcode() != TargetOpcode::PATCHABLE_RET)) || (MI.getOpcode() == X86::POP64r)) {
+          if (MI.getOpcode() == X86::POP64r){
+            std::string tmp_str;
+            raw_string_ostream ss(tmp_str);
+            ss << MI << "\n";
+            tmp_str = reduce(tmp_str, " ", " \t");
+            // if (tmp_str.substr(7, 13).find("frame-destroy") != std::string::npos) {
+              // continue;
+            // }
+          }
           // outs() << "Ret/Pop MI: " << MI << "\n";
           bytes_read += 8;
           loads++;
