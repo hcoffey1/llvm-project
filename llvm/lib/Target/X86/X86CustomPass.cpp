@@ -460,6 +460,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       size_t counters = 0;
       bool init = false;
       // outs() << "MBB: " << MBB.getName() << "\n";
+      // MBB.print(outs());
       for (auto &MI : MBB) {
 
         if (MI == MBB.begin() && init) {
@@ -516,11 +517,13 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             }
             if(mop->isStore()){
               // outs() << "Store MI: " << MI << "\n";
+              // outs() << "Store MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_written += mop->getSize();
               stores++;
             }
             if(mop->isLoad()){
               // outs() << "Load MI: " << MI << "\n";
+              // outs() << "Load MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_read += mop->getSize();
               loads++;
             }
@@ -573,12 +576,15 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
         // outs() << "Observed loads: " << loads << ", bytes read: " << bytes_read << ", stores: " << stores << ", bytes written: " << bytes_written << ", counters: " << counters << "\n";
         // outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
         // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
+        // outs() << "Counters: " << counters << "\n";
         if (counters  < loads) {
             pdVec[ID.ceID].LoadCount += (loads - counters)*ID.sf;
+            bytes_read -= 8 * counters;
             pdVec[ID.ceID].MemInstructionCount += (loads - counters)*ID.sf;
         }
         if (counters < stores) {
             pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
+            bytes_written -= 8 * counters;
             pdVec[ID.ceID].MemInstructionCount += (stores - counters)*ID.sf;
         }
 	    // functionStoreCount += (stores - counters)*ID.sf;
