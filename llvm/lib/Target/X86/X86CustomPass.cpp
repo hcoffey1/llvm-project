@@ -52,6 +52,8 @@ struct ProfileData {
   uint64_t OtherInstCount = 0;
   uint64_t IntrinsicLoad = 0;
   uint64_t IntrinsicStore = 0;
+  uint64_t TotalInstCount = 0;
+  uint64_t CounterInstCount = 0;
   bool IsIndirect;
   bool EnableMIRPass;
 };
@@ -261,6 +263,8 @@ bool readLogFile(std::string file) {
     inProfile.StoreCount = 0;
     inProfile.BytesRead = 0;
     inProfile.BytesWritten = 0;
+    inProfile.TotalInstCount = 0;
+    inProfile.CounterInstCount = 0;
 
     pdVec.push_back(inProfile);
     funcNameVec.push_back(FunctionName);
@@ -458,6 +462,8 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       size_t stores = 0;
       size_t bytes_written = 0;
       size_t counters = 0;
+      size_t total_insns = 0;
+      size_t counter_insns = 0;
       bool init = false;
       // outs() << "MBB: " << MBB.getName() << "\n";
       // MBB.print(outs());
@@ -472,6 +478,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 
         if(MI.isDebugInstr()) continue;
         // outs() << "MI: " << MI << "\n";
+        ++total_insns;
 
         if(MI.getOpcode() == TargetOpcode::G_INTRINSIC)
         {
@@ -513,6 +520,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             // If present, do not increment
             // We still miss one extra load and store, so subtract those at the end
             if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos)) {
+                ++counter_insns;
                 continue;
             }
             if(mop->isStore()){
@@ -593,6 +601,8 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 	    // totalLoadCount += (loads - 3 * counters)*ID.sf;
         // outs() << "MIR: " << "ID " << ID.ceID << " StoreCount after: " << pdVec[ID.ceID].StoreCount << "\n";
         // outs() << "MIR: " << "ID " << ID.ceID << " LoadCount after: " << pdVec[ID.ceID].LoadCount << "\n";
+        pdVec[ID.ceID].CounterInstCount += counter_insns + (5 * counters);
+        pdVec[ID.ceID].TotalInstCount += total_insns;
         pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
         pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
       }
