@@ -573,16 +573,16 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       for (auto ID : bbTagVec) {
         // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
         // outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
-        // outs() << "Observed loads: " << loads << ", bytes read: " << bytes_read << ", stores: " << stores << ", bytes written: " << bytes_written << ", counters: " << counters << "\n";
+        // outs() << "Observed loads: " << loads - counters << ", bytes read: " << bytes_read - 8*counters << ", stores: " << stores - counters << ", bytes written: " << bytes_written - 8*counters << ", counters: " << counters << "\n";
         // outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
         // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
         // outs() << "Counters: " << counters << "\n";
-        if (counters  < loads) {
+        if (counters <= loads) {
             pdVec[ID.ceID].LoadCount += (loads - counters)*ID.sf;
             bytes_read -= 8 * counters;
             pdVec[ID.ceID].MemInstructionCount += (loads - counters)*ID.sf;
         }
-        if (counters < stores) {
+        if (counters <= stores) {
             pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
             bytes_written -= 8 * counters;
             pdVec[ID.ceID].MemInstructionCount += (stores - counters)*ID.sf;
