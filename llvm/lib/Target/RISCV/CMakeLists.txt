@@ -41,6 +41,7 @@ add_llvm_target(RISCVCodeGen
   RISCVTargetMachine.cpp
   RISCVTargetObjectFile.cpp
   RISCVTargetTransformInfo.cpp
+  RISCVCustomPass.cpp
 
   LINK_COMPONENTS
   Analysis
