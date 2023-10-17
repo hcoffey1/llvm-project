@@ -18,7 +18,8 @@
 using namespace llvm;
 
 #define RISCV_MACHINEINSTR_CUSTOM_PASS_NAME "Custom RISCV pass"
-//#define X86_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME "Custom X86 pass - static mix check"
+#define RISCV_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME "Custom X86 pass - static mix check"
+#if 0 //Example MIR Pass
 namespace {
 
 class RISCVCustomPass : public MachineFunctionPass {
@@ -54,9 +55,9 @@ INITIALIZE_PASS(RISCVCustomPass, "RISCV-custompass",
 namespace llvm {
 FunctionPass *createRISCVCustomPass() { return new RISCVCustomPass(); }
 } // namespace llvm
+#endif
 
-
-#if 0
+#if 1
 namespace {
 
 constexpr int checksum(const char *data, size_t length) {
@@ -100,23 +101,23 @@ std::vector<std::string> funcNameVec;
 
 bool FirstRun = true;
 
-class X86CustomPass : public MachineFunctionPass {
+class RISCVCustomPass : public MachineFunctionPass {
 public:
   static char ID;
 
-  X86CustomPass() : MachineFunctionPass(ID) {
-    initializeX86CustomPassPass(*PassRegistry::getPassRegistry());
+  RISCVCustomPass() : MachineFunctionPass(ID) {
+    initializeRISCVCustomPassPass(*PassRegistry::getPassRegistry());
   }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
   void getAnalysisUsage(AnalysisUsage &AU) const override;
 
   StringRef getPassName() const override {
-    return X86_MACHINEINSTR_CUSTOM_PASS_NAME;
+    return RISCV_MACHINEINSTR_CUSTOM_PASS_NAME;
   }
 };
 
-void X86CustomPass::getAnalysisUsage(AnalysisUsage &AU) const
+void RISCVCustomPass::getAnalysisUsage(AnalysisUsage &AU) const
 {
     MachineFunctionPass::getAnalysisUsage(AU);
     //AU.addRequired<MachineLoopInfo>();
@@ -430,13 +431,13 @@ void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
   }
 }
 
-char X86CustomPass::ID = 0;
+char RISCVCustomPass::ID = 0;
 // uint64_t totalLoadCount = 0;
 // uint64_t totalStoreCount = 0;
 
 // TODO: Optimize how we update the log file so we are not reading/writing the
 // whole thing each time
-bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
+bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
 
   //Guard to catch empty functions passed in
   if (MF.empty()) {
@@ -574,6 +575,8 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             }
           }
         } 
+
+        #if 0
         // X86 pushes/pops the return address to/from stack on call/return
         if((MI.isCall() && (MI.getOpcode() != TargetOpcode::PATCHABLE_EVENT_CALL)) || (MI.getOpcode() == X86::PUSH64r)) {
           std::string tmp_str;
@@ -609,6 +612,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           bytes_read += 8;
           loads++;
         }
+        #endif
         // if(bbTagVec.back().ceID == 4) {
         //   outs() << MI << "\n";
         //   outs() << "L: " << loads << " S: " << stores << "\n";
@@ -656,25 +660,25 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
   return false;
 }
 
-class X86CustomPassStaticMixCheck : public MachineFunctionPass {
+class RISCVCustomPassStaticMixCheck : public MachineFunctionPass {
 public:
   static char ID;
 
-  X86CustomPassStaticMixCheck() : MachineFunctionPass(ID) {
-    initializeX86CustomPassStaticMixCheckPass(*PassRegistry::getPassRegistry());
+  RISCVCustomPassStaticMixCheck() : MachineFunctionPass(ID) {
+    initializeRISCVCustomPassStaticMixCheckPass(*PassRegistry::getPassRegistry());
   }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
   void getAnalysisUsage(AnalysisUsage &AU) const override;
 
   StringRef getPassName() const override {
-    return X86_MACHINEINSTR_CUSTOM_PASS_NAME;
+    return RISCV_MACHINEINSTR_CUSTOM_PASS_NAME;
   }
 };
 
-char X86CustomPassStaticMixCheck::ID = 0;
+char RISCVCustomPassStaticMixCheck::ID = 0;
 
-void X86CustomPassStaticMixCheck::getAnalysisUsage(AnalysisUsage &AU) const
+void RISCVCustomPassStaticMixCheck::getAnalysisUsage(AnalysisUsage &AU) const
 {
     MachineFunctionPass::getAnalysisUsage(AU);
 }
@@ -699,7 +703,7 @@ void writeStaticMixInfo(MachineFunction &MF, const ProfileData &Prof, size_t BBC
     LogFile.close();
 }
 
-bool X86CustomPassStaticMixCheck::runOnMachineFunction(MachineFunction &MF) {
+bool RISCVCustomPassStaticMixCheck::runOnMachineFunction(MachineFunction &MF) {
 
   ProfileData StaticMixFuncInfo;
   size_t BasicBlockCountFunc = 0;
@@ -730,14 +734,14 @@ bool X86CustomPassStaticMixCheck::runOnMachineFunction(MachineFunction &MF) {
 
 } // namespace
 
-INITIALIZE_PASS(X86CustomPass, "X86-custompass",
-                X86_MACHINEINSTR_CUSTOM_PASS_NAME, true, true)
+INITIALIZE_PASS(RISCVCustomPass, "RISCV-custompass",
+                RISCV_MACHINEINSTR_CUSTOM_PASS_NAME, true, true)
 
-INITIALIZE_PASS(X86CustomPassStaticMixCheck, "X86-custompass-staticmixcheck",
-                X86_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME, true, true)
+INITIALIZE_PASS(RISCVCustomPassStaticMixCheck, "RISCV-custompass-staticmixcheck",
+                RISCV_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME, true, true)
 
 namespace llvm {
-FunctionPass *createX86CustomPass() { return new X86CustomPass(); }
-FunctionPass *createX86CustomPassStaticMixCheck() { return new X86CustomPassStaticMixCheck(); }
+FunctionPass *createRISCVCustomPass() { return new RISCVCustomPass(); }
+FunctionPass *createRISCVCustomPassStaticMixCheck() { return new RISCVCustomPassStaticMixCheck(); }
 } // namespace llvm
 #endif

@@ -48,6 +48,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVExpandPseudoPass(*PR);
   initializeRISCVInsertVSETVLIPass(*PR);
   initializeRISCVCustomPassPass(*PR);
+  initializeRISCVCustomPassStaticMixCheckPass(*PR);
 }
 
 static StringRef computeDataLayout(const Triple &TT) {
@@ -220,4 +221,5 @@ void RISCVPassConfig::addPostRegAlloc() {
   if (TM->getOptLevel() != CodeGenOpt::None && EnableRedundantCopyElimination)
     addPass(createRISCVRedundantCopyEliminationPass());
   addPass(createRISCVCustomPass());
+  addPass(createRISCVCustomPassStaticMixCheck());
 }
