@@ -601,8 +601,8 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 	    // totalLoadCount += (loads - 3 * counters)*ID.sf;
         // outs() << "MIR: " << "ID " << ID.ceID << " StoreCount after: " << pdVec[ID.ceID].StoreCount << "\n";
         // outs() << "MIR: " << "ID " << ID.ceID << " LoadCount after: " << pdVec[ID.ceID].LoadCount << "\n";
-        pdVec[ID.ceID].CounterInstCount += counter_insns + (5 * counters);
-        pdVec[ID.ceID].TotalInstCount += total_insns;
+        pdVec[ID.ceID].CounterInstCount += counter_insns + counters;
+        pdVec[ID.ceID].TotalInstCount += total_insns - (4 * counters);
         pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
         pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
       }
