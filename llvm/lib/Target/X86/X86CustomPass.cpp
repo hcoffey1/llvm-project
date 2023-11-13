@@ -427,6 +427,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
   }
 
   // outs() << "MF: " << MF.getName() << "\n";
+  bool thread_exit_frame_flag = false;
 
   // Iterate over MBB
   for (auto &MBB : MF) {
@@ -519,7 +520,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             // Check for CounterArray or CounterArrayRegionOffset in MI
             // If present, do not increment
             // We still miss one extra load and store, so subtract those at the end
-            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos)) {
+            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("TimingProfile") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
                 ++counter_insns;
                 continue;
             }
@@ -546,8 +547,12 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           if (tmp_str.find("on_thread_exit") != std::string::npos) {
             bytes_written -= 8 * num_frame_setup_push;
             stores -= num_frame_setup_push;
-            bytes_read -= 8 * num_frame_setup_push;
-            loads -= num_frame_setup_push;
+	    thread_exit_frame_flag = true;
+            // bytes_read -= 8 * num_frame_setup_push;
+            // loads -= num_frame_setup_push;
+            continue;
+          }
+          if ((tmp_str.find("timingEvent") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
             continue;
           }
           if ((MI.getOpcode() == X86::PUSH64r) && (tmp_str.substr(0, 11).find("frame-setup") != std::string::npos)) {
@@ -564,9 +569,9 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             raw_string_ostream ss(tmp_str);
             ss << MI << "\n";
             tmp_str = reduce(tmp_str, " ", " \t");
-            // if (tmp_str.substr(7, 13).find("frame-destroy") != std::string::npos) {
-              // continue;
-            // }
+            if (thread_exit_frame_flag && (tmp_str.substr(7, 13).find("frame-destroy") != std::string::npos)) {
+              continue;
+            }
           }
           // outs() << "Ret/Pop MI: " << MI << "\n";
           bytes_read += 8;
