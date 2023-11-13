@@ -225,6 +225,20 @@ bool bbHasCounter(MachineInstr &MI) {
   return false;
 }
 
+bool isToolPassBegin(MachineInstr &MI) {
+  std::string tmp_str;
+  raw_string_ostream ss(tmp_str);
+  ss << MI << "\n";
+
+  std::string token = tmp_str.substr(13 /* Starting index*/, 15 /* length */);
+  if (token.find("TOOL_PASS_BEGIN") != std::string::npos) {
+    // outs() << "Found begin marker" << "\n";
+    return true;
+  }
+
+  return false;
+}
+
 BBTag getBBTag(MachineInstr &MI) {
   std::string tmp_str;
   raw_string_ostream ss(tmp_str);
@@ -540,9 +554,18 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
 
         if (MI.isInlineAsm())
         {
+          // outs() << MI << "\n";
           if (isCounter(MI))
           {
             counters++;
+          }
+          if (isToolPassBegin(MI))
+          {
+              bytes_read = 0;
+              loads = 0;
+              bytes_written = 0;
+              stores = 0;
+              counters = 0;
           }
           continue;
         }
