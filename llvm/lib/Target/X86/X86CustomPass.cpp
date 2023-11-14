@@ -442,6 +442,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 
   // outs() << "MF: " << MF.getName() << "\n";
   bool thread_exit_frame_flag = false;
+  bool toolPassBeginEncountered = false;
 
   // Iterate over MBB
   for (auto &MBB : MF) {
@@ -480,6 +481,13 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       size_t total_insns = 0;
       size_t counter_insns = 0;
       bool init = false;
+
+      size_t stack_stores = 0;
+      size_t stack_bytes_written = 0;
+      if (pdVec[bbTagVec[0].ceID].IsIndirect) {
+        toolPassBeginEncountered = true;
+      }
+
       // outs() << "MBB: " << MBB.getName() << "\n";
       // MBB.print(outs());
       for (auto &MI : MBB) {
@@ -524,10 +532,11 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           }
           if (isToolPassBegin(MI))
           {
+              toolPassBeginEncountered = true;
               bytes_read = 0;
               loads = 0;
-              bytes_written = 0;
-              stores = 0;
+              bytes_written = stack_bytes_written;
+              stores = stack_stores;
               counters = 0;
           }
           continue;
@@ -552,6 +561,12 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
               // outs() << "Store MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_written += mop->getSize();
               stores++;
+	      if(toolPassBeginEncountered == false) {
+                if (tmp_str.find("into %stack") != std::string::npos) {
+                  stack_bytes_written += mop->getSize();
+                  stack_stores++;
+		}
+	      }
             }
             if(mop->isLoad()){
               // outs() << "Load MI: " << MI << "\n";
