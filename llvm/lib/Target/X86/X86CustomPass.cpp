@@ -480,6 +480,10 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
       size_t total_insns = 0;
       size_t counter_insns = 0;
       bool init = false;
+      size_t te_loads = 0;
+      size_t te_bytes_read = 0;
+      size_t te_stores = 0;
+      size_t te_bytes_written = 0;
       // outs() << "MBB: " << MBB.getName() << "\n";
       // MBB.print(outs());
       for (auto &MI : MBB) {
@@ -524,10 +528,10 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           }
           if (isToolPassBegin(MI))
           {
-              bytes_read = 0;
-              loads = 0;
-              bytes_written = 0;
-              stores = 0;
+              bytes_read -= te_bytes_read;
+              loads -= te_loads;
+              bytes_written -= te_bytes_written;
+              stores -= te_stores;
               counters = 0;
           }
           continue;
@@ -568,14 +572,21 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           ss << MI << "\n";
           tmp_str = reduce(tmp_str, " ", " \t");
           if (tmp_str.find("on_thread_exit") != std::string::npos) {
-            bytes_written -= 8 * num_frame_setup_push;
-            stores -= num_frame_setup_push;
+            // bytes_written -= 8 * num_frame_setup_push;
+            // stores -= num_frame_setup_push;
 	    thread_exit_frame_flag = true;
             // bytes_read -= 8 * num_frame_setup_push;
             // loads -= num_frame_setup_push;
             continue;
           }
-          if ((tmp_str.find("timingEvent") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
+          if (tmp_str.find("tool_dyn.cc") != std::string::npos) {
+            continue;
+          }
+          if (tmp_str.find("timingEvent") != std::string::npos) {
+            te_bytes_read = bytes_read;
+            te_loads = loads;
+            te_bytes_written = bytes_written;
+            te_stores = stores;
             continue;
           }
           if ((MI.getOpcode() == X86::PUSH64r) && (tmp_str.substr(0, 11).find("frame-setup") != std::string::npos)) {
