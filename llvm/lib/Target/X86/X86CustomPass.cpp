@@ -441,7 +441,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
   }
 
   // outs() << "MF: " << MF.getName() << "\n";
-  bool thread_exit_frame_flag = false;
+  // bool thread_exit_frame_flag = false;
   bool toolPassBeginEncountered = false;
 
   // Iterate over MBB
@@ -535,8 +535,8 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
               toolPassBeginEncountered = true;
               bytes_read = 0;
               loads = 0;
-              bytes_written = stack_bytes_written;
-              stores = stack_stores;
+              bytes_written = 0;
+              stores = 0;
               counters = 0;
           }
           continue;
@@ -557,18 +557,20 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
                 continue;
             }
             if(mop->isStore()){
+              // Do not record stack accesses
+              if (tmp_str.find("into %stack") != std::string::npos) {
+                continue;
+              }
               // outs() << "Store MI: " << MI << "\n";
               // outs() << "Store MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_written += mop->getSize();
               stores++;
-	      if(toolPassBeginEncountered == false) {
-                if (tmp_str.find("into %stack") != std::string::npos) {
-                  stack_bytes_written += mop->getSize();
-                  stack_stores++;
-		}
-	      }
             }
             if(mop->isLoad()){
+              // Do not record stack accesses
+              if (tmp_str.find("from %stack") != std::string::npos) {
+                continue;
+              }
               // outs() << "Load MI: " << MI << "\n";
               // outs() << "Load MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_read += mop->getSize();
@@ -576,6 +578,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             }
           }
         } 
+        /* Ignore call and return instructions
         // X86 pushes/pops the return address to/from stack on call/return
         if((MI.isCall() && (MI.getOpcode() != TargetOpcode::PATCHABLE_EVENT_CALL)) || (MI.getOpcode() == X86::PUSH64r)) {
           std::string tmp_str;
@@ -585,7 +588,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           if (tmp_str.find("on_thread_exit") != std::string::npos) {
             bytes_written -= 8 * num_frame_setup_push;
             stores -= num_frame_setup_push;
-	    thread_exit_frame_flag = true;
+            thread_exit_frame_flag = true;
             // bytes_read -= 8 * num_frame_setup_push;
             // loads -= num_frame_setup_push;
             continue;
@@ -615,6 +618,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
           bytes_read += 8;
           loads++;
         }
+        */
         // if(bbTagVec.back().ceID == 4) {
         //   outs() << MI << "\n";
         //   outs() << "L: " << loads << " S: " << stores << "\n";
