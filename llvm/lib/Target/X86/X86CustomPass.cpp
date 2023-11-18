@@ -558,7 +558,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             }
             if(mop->isStore()){
               // Do not record stack accesses
-              if (tmp_str.find("into %stack") != std::string::npos) {
+              if ((tmp_str.find("into %stack") != std::string::npos) || (tmp_str.find("into stack") != std::string::npos) || (tmp_str.find("into %fixed-stack") != std::string::npos)) {
                 continue;
               }
               // outs() << "Store MI: " << MI << "\n";
@@ -568,7 +568,7 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             }
             if(mop->isLoad()){
               // Do not record stack accesses
-              if (tmp_str.find("from %stack") != std::string::npos) {
+              if ((tmp_str.find("from %stack") != std::string::npos) || (tmp_str.find("from stack") != std::string::npos) || (tmp_str.find("from %fixed-stack") != std::string::npos)) {
                 continue;
               }
               // outs() << "Load MI: " << MI << "\n";
