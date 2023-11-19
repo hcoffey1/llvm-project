@@ -548,27 +548,35 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
             std::string tmp_str;
             raw_string_ostream ss(tmp_str);
             ss << MI << "\n";
-            tmp_str = reduce(tmp_str, " ", " \t");
+            std::string mi_str = reduce(tmp_str, " ", " \t");
             // Check for CounterArray or CounterArrayRegionOffset in MI
             // If present, do not increment
             // We still miss one extra load and store, so subtract those at the end
-            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("TimingProfile") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
+            if ((mi_str.find("RuntimeArray") != std::string::npos) || (mi_str.find("CounterArray") != std::string::npos) || (mi_str.find("TimingProfile") != std::string::npos) || (mi_str.find("tool_dyn.cc") != std::string::npos)) {
                 ++counter_insns;
                 continue;
             }
             if(mop->isStore()){
               // Do not record stack accesses
-              if ((tmp_str.find("into %stack") != std::string::npos) || (tmp_str.find("into stack") != std::string::npos) || (tmp_str.find("into %fixed-stack") != std::string::npos)) {
+              if ((mi_str.find("into %stack") != std::string::npos) || (mi_str.find("into stack") != std::string::npos) || (mi_str.find("into %fixed-stack") != std::string::npos)) {
+                continue;
+              }
+              tmp_str.clear();
+              ss << MI.getOperand(0) << "\n";
+              // if (tmp_str.find("$rsp") != std::string::npos) {
+              if (tmp_str.substr(0, 4) == "$rsp") {
                 continue;
               }
               // outs() << "Store MI: " << MI << "\n";
+              // outs() << "Num Operands: " << MI.getNumOperands() << "\n";
+              // outs() << "Operand 0: " << MI.getOperand(0) << "\n";
               // outs() << "Store MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_written += mop->getSize();
               stores++;
             }
             if(mop->isLoad()){
               // Do not record stack accesses
-              if ((tmp_str.find("from %stack") != std::string::npos) || (tmp_str.find("from stack") != std::string::npos) || (tmp_str.find("from %fixed-stack") != std::string::npos)) {
+              if ((mi_str.find("from %stack") != std::string::npos) || (mi_str.find("from stack") != std::string::npos) || (mi_str.find("from %fixed-stack") != std::string::npos)) {
                 continue;
               }
               // outs() << "Load MI: " << MI << "\n";
