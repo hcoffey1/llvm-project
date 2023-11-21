@@ -539,6 +539,21 @@ bool X86CustomPass::runOnMachineFunction(MachineFunction &MF) {
 
         //outs() << "MIR: bbTagVec Size: " << bbTagVec.size() << "\n";
         if (MI.mayLoadOrStore()) {
+          if(MI.getNumMemOperands() == 0) {
+            // outs() << "MI: " << MI << "\n";
+	    if(MI.getOpcode() == X86::MOV64rm) {
+              bytes_read += 8;
+              loads++;
+	    }
+	    if(MI.getOpcode() == X86::MOV64mr) {
+              bytes_written += 8;
+              stores++;
+	    }
+	    if(MI.getOpcode() == X86::VMOVSDrm_alt) {
+              bytes_read += 8;
+              loads++;
+	    }
+	  }
           for (auto mop : MI.memoperands()) {
             std::string tmp_str;
             raw_string_ostream ss(tmp_str);
