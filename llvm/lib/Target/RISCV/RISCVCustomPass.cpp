@@ -73,7 +73,9 @@ struct ProfileData {
   uint64_t PragmaRegionID = 0;
   uint64_t GroupNumber = 0;
   uint64_t StoreCount = 0;
+  uint64_t FloatStoreCount = 0;
   uint64_t LoadCount = 0;
+  uint64_t FloatLoadCount = 0;
   uint64_t BytesRead = 0;
   uint64_t BytesWritten = 0;
   uint64_t IntInstructionCount = 0;
@@ -92,6 +94,7 @@ struct ProfileData {
   uint64_t IntrinsicStore = 0;
   uint64_t TotalInstCount = 0;
   uint64_t CounterInstCount = 0;
+  uint64_t SplitCounters = 0;
   bool IsIndirect;
   bool EnableMIRPass;
 };
@@ -100,6 +103,9 @@ std::vector<ProfileData> pdVec;
 std::vector<std::string> funcNameVec;
 
 bool FirstRun = true;
+
+std::string CalleeSavedRegisters[] = {"x8","x9","x18","x19","x20","x21","x22","x23","x24","x25","x26","x27"};
+unsigned int RegisterMask = 0;
 
 class RISCVCustomPass : public MachineFunctionPass {
 public:
@@ -170,7 +176,41 @@ struct BBTag {
   int ceID;
   size_t sf;
 };
+
+bool isBeginCounter(MachineInstr &MI) {
+  std::string tmp_str;
+  raw_string_ostream ss(tmp_str);
+  ss << MI << "\n";
+
+  if (tmp_str.size() != 60) {
+      return false;
+  }
+  std::string token = tmp_str.substr(13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
+  if (token.find("ZRAY_COUNTER_START") != std::string::npos) {
+    return true;
+  }
+
+  return false;
+}
+bool isEndCounter(MachineInstr &MI) {
+  std::string tmp_str;
+  raw_string_ostream ss(tmp_str);
+  ss << MI << "\n";
+
+  if (tmp_str.size() != 58) {
+      return false;
+  }
+  std::string token = tmp_str.substr(13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
+   if (token.find("ZRAY_COUNTER_END") != std::string::npos) {
+    return true;
+  }
+
+  return false;
+}
+
 bool isCounter(MachineInstr &MI) {
+	return isBeginCounter(MI) || isEndCounter(MI);
+#if 0
   std::string tmp_str;
   raw_string_ostream ss(tmp_str);
   ss << MI << "\n";
@@ -199,6 +239,7 @@ bool isCounter(MachineInstr &MI) {
   }
 
   return false;
+#endif
 }
 
 bool bbHasCounter(MachineInstr &MI) {
@@ -312,11 +353,14 @@ bool readLogFile(std::string file) {
     // Clear instruction types we will replace with MIR counts
     inProfile.MemInstructionCount = 0;
     inProfile.LoadCount = 0;
+    inProfile.FloatLoadCount = 0;
     inProfile.StoreCount = 0;
+    inProfile.FloatStoreCount = 0;
     inProfile.BytesRead = 0;
     inProfile.BytesWritten = 0;
     inProfile.TotalInstCount = 0;
     inProfile.CounterInstCount = 0;
+    inProfile.SplitCounters = 0;
 
     pdVec.push_back(inProfile);
     funcNameVec.push_back(FunctionName);
@@ -445,6 +489,63 @@ void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
   }
 }
 
+bool isFloatMemAccess(MachineInstr &MI)
+{
+	const std::string floatIns[] = {"FLD", "FLW", "FSD", "FSW"} ;
+        if (MI.mayLoadOrStore()) {
+		std::string tmp_str;
+		raw_string_ostream ss(tmp_str);
+		ss << MI << "\n";
+		tmp_str = reduce(tmp_str, " ", " \t");
+
+		for(auto ins : floatIns)
+		{
+			if (tmp_str.find(ins) != std::string::npos)
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+unsigned int countSetBits(unsigned int n)
+{
+    unsigned int count = 0;
+    while (n) {
+        count += n & 1;
+        n >>= 1;
+    }
+    return count;
+}
+
+void detectSpill(MachineInstr &MI)
+{
+	std::string tmp_str;
+	raw_string_ostream ss(tmp_str);
+	ss << MI << "\n";
+	tmp_str = reduce(tmp_str, " ", " \t");
+
+        if(MI.isCall()) {
+		outs() << "Found ra spill.\n";
+		RegisterMask |= 0x1;
+	}
+	else{
+		int i = 1;
+		for(auto reg : CalleeSavedRegisters)
+		{
+		    //if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("TimingProfile") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
+		    if (tmp_str.find(reg) != std::string::npos)
+		    {
+			outs() << "Found " << reg << " spill.\n";
+			    RegisterMask |= 1 << i;
+		    }
+			i++;
+		}
+	}
+}
+
 char RISCVCustomPass::ID = 0;
 // uint64_t totalLoadCount = 0;
 // uint64_t totalStoreCount = 0;
@@ -452,7 +553,6 @@ char RISCVCustomPass::ID = 0;
 // TODO: Optimize how we update the log file so we are not reading/writing the
 // whole thing each time
 bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
-
   //Guard to catch empty functions passed in
   if (MF.empty()) {
     return false;
@@ -478,7 +578,9 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
     }
   }
 
-  // outs() << "MF: " << MF.getName() << "\n";
+  int first_ce_id = -1;
+  RegisterMask = 0;
+  outs() << "*************MF: " << MF.getName() << "\n";
 
   // Iterate over MBB
   for (auto &MBB : MF) {
@@ -508,12 +610,15 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
                 }
                 outs() << "\n";
 #endif
-
       size_t loads = 0;
+      size_t float_loads = 0;
       size_t bytes_read = 0;
       size_t stores = 0;
+      size_t float_stores = 0;
       size_t bytes_written = 0;
       size_t counters = 0;
+      size_t begin_counters = 0;
+      size_t end_counters = 0;
       size_t total_insns = 0;
       size_t counter_insns = 0;
       bool init = false;
@@ -525,6 +630,8 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
           outs() << "Loop!\n";
           break;
         }
+	
+	detectSpill(MI);	
 
         init = true;
 
@@ -555,17 +662,25 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
         if (MI.isInlineAsm())
         {
           // outs() << MI << "\n";
-          if (isCounter(MI))
+          if (isBeginCounter(MI))
           {
-            counters++;
+            begin_counters++;
           }
+	  else if(isEndCounter(MI))
+	  {
+	    end_counters++;
+	  }
           if (isToolPassBegin(MI))
           {
               bytes_read = 0;
               loads = 0;
+              float_loads = 0;
               bytes_written = 0;
               stores = 0;
+              float_stores = 0;
               counters = 0;
+              begin_counters = 0;
+              end_counters = 0;
           }
           continue;
         }
@@ -580,7 +695,8 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
             // Check for CounterArray or CounterArrayRegionOffset in MI
             // If present, do not increment
             // We still miss one extra load and store, so subtract those at the end
-            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos)) {
+            //if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos)) {
+            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("TimingProfile") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
                 ++counter_insns;
                 continue;
             }
@@ -589,12 +705,20 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
               // outs() << "Store MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_written += mop->getSize();
               stores++;
+	      if(isFloatMemAccess(MI))
+	      {
+		      float_stores++;
+	      }
             }
             if(mop->isLoad()){
               // outs() << "Load MI: " << MI << "\n";
               // outs() << "Load MI: " << MI << " size: " << mop->getSize() << "\n";
               bytes_read += mop->getSize();
               loads++;
+	      if(isFloatMemAccess(MI))
+	      {
+		      float_loads++;
+	      }
             }
           }
         } 
@@ -641,21 +765,39 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
         //   outs() << "L: " << loads << " S: " << stores << "\n";
         // }
       }
+	
+	if (first_ce_id < 0)
+	{
+		first_ce_id = bbTagVec[0].ceID;
+	}
 
       for (auto ID : bbTagVec) {
-        // outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-        // outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
-        // outs() << "Observed loads: " << loads - counters << ", bytes read: " << bytes_read - 8*counters << ", stores: " << stores - counters << ", bytes written: " << bytes_written - 8*counters << ", counters: " << counters << "\n";
+	
+	      counters = std::max(begin_counters,end_counters);
+	if(begin_counters != end_counters)
+	{
+		pdVec[ID.ceID].SplitCounters++;
+	}
+	outs() << "V Parsing block V====================================\n";
+	outs() << MBB << "\n";
+        outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
+        outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
+	outs() << "begin counters: " << begin_counters << ", end counters: " << end_counters << "\n";
+	outs() << "loads: " << loads << ", stores: " << stores << "\n";
+	outs() << "counters: " << counters << "\n";
+         outs() << "Observed loads: " << loads - counters << ", bytes read: " << bytes_read - 8*counters << ", stores: " << stores - counters << ", bytes written: " << bytes_written - 8*counters << ", counters: " << counters << "float load:store " << float_loads << ":" << float_stores << "\n";
         // outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
         // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
         // outs() << "Counters: " << counters << "\n";
         if (counters <= loads) {
             pdVec[ID.ceID].LoadCount += (loads - counters)*ID.sf;
+            pdVec[ID.ceID].FloatLoadCount += (float_loads)*ID.sf;
             bytes_read -= 8 * counters;
             pdVec[ID.ceID].MemInstructionCount += (loads - counters)*ID.sf;
         }
         if (counters <= stores) {
             pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
+            pdVec[ID.ceID].FloatStoreCount += (float_stores)*ID.sf;
             bytes_written -= 8 * counters;
             pdVec[ID.ceID].MemInstructionCount += (stores - counters)*ID.sf;
         }
@@ -672,6 +814,14 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
       }
     }
   }
+
+	if(first_ce_id >=0 && pdVec[first_ce_id].IsIndirect)
+	{
+		unsigned int spills = countSetBits(RegisterMask);
+		outs() << "^^^Total Spill count^^^ : " << spills << "\n";
+		pdVec[first_ce_id].LoadCount += spills;
+		pdVec[first_ce_id].StoreCount += spills;
+	}
   // outs() << "Function: " << MF.getName().str() << "\n";
   // outs() << "Loads      : " << functionLoadCount << "\n";
   // outs() << "Stores     : " << functionStoreCount << "\n";
