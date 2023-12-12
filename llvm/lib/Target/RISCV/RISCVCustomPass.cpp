@@ -2,13 +2,6 @@
 #include "RISCV.h"
 #include "RISCVInstrInfo.h"
 
-// #include <llvm/Analysis/ScalarEvolutionExpressions.h>
-//#include <llvm/Analysis/ScalarEvolution.h>
-// #include <llvm/Analysis/PostDominators.h>
-
-// #include "llvm/CodeGen/MachineDominators.h"
-// #include "llvm/CodeGen/MachineLoopInfo.h"
-
 #include "llvm/CodeGen/FastISel.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -18,44 +11,8 @@
 using namespace llvm;
 
 #define RISCV_MACHINEINSTR_CUSTOM_PASS_NAME "Custom RISCV pass"
-#define RISCV_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME "Custom X86 pass - static mix check"
-#if 0 //Example MIR Pass
-namespace {
-
-class RISCVCustomPass : public MachineFunctionPass {
-public:
-  static char ID;
-
-  RISCVCustomPass() : MachineFunctionPass(ID) {
-    initializeRISCVCustomPassPass(*PassRegistry::getPassRegistry());
-  }
-
-  bool runOnMachineFunction(MachineFunction &MF) override;
-  void getAnalysisUsage(AnalysisUsage &AU) const override;
-
-  StringRef getPassName() const override {
-    return RISCV_MACHINEINSTR_CUSTOM_PASS_NAME;
-  }
-};
-
-char RISCVCustomPass::ID = 0;
-void RISCVCustomPass::getAnalysisUsage(AnalysisUsage &AU) const
-{
-    MachineFunctionPass::getAnalysisUsage(AU);
-}
-bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
-  outs() << "Inside CUSTOM RISCV MIR function-----------------------------------------------------\n";
-}
-
-}
-INITIALIZE_PASS(RISCVCustomPass, "RISCV-custompass",
-                RISCV_MACHINEINSTR_CUSTOM_PASS_NAME, true, true)
-
-
-namespace llvm {
-FunctionPass *createRISCVCustomPass() { return new RISCVCustomPass(); }
-} // namespace llvm
-#endif
+#define RISCV_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME                     \
+  "Custom X86 pass - static mix check"
 
 #if 1
 namespace {
@@ -104,7 +61,8 @@ std::vector<std::string> funcNameVec;
 
 bool FirstRun = true;
 
-std::string CalleeSavedRegisters[] = {"x8","x9","x18","x19","x20","x21","x22","x23","x24","x25","x26","x27"};
+std::string CalleeSavedRegisters[] = {"x8",  "x9",  "x18", "x19", "x20", "x21",
+                                      "x22", "x23", "x24", "x25", "x26", "x27"};
 unsigned int RegisterMask = 0;
 
 class RISCVCustomPass : public MachineFunctionPass {
@@ -123,20 +81,8 @@ public:
   }
 };
 
-void RISCVCustomPass::getAnalysisUsage(AnalysisUsage &AU) const
-{
-    MachineFunctionPass::getAnalysisUsage(AU);
-    //AU.addRequired<MachineLoopInfo>();
-    // Specify we need the loopinfo pass to run before this pass
-    //AU.addRequired<MachineDominatorTree>();
-    //AU.addPreserved<MachineDominatorTree>();
-
-    //AU.addRequired<MachineLoopInfo>();
-    //AU.addPreserved<MachineLoopInfo>();
-
-    //AU.addRequired<LoopInfoWrapperPass>();
-    //AU.addRequired<ScalarEvolutionWrapperPass>();
-    //AU.addRequired<PostDominatorTreeWrapperPass>();
+void RISCVCustomPass::getAnalysisUsage(AnalysisUsage &AU) const {
+  MachineFunctionPass::getAnalysisUsage(AU);
 }
 
 // Remove leading/trailing whitespace from string
@@ -183,9 +129,10 @@ bool isBeginCounter(MachineInstr &MI) {
   ss << MI << "\n";
 
   if (tmp_str.size() != 60) {
-      return false;
+    return false;
   }
-  std::string token = tmp_str.substr(13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
+  std::string token = tmp_str.substr(
+      13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
   if (token.find("ZRAY_COUNTER_START") != std::string::npos) {
     return true;
   }
@@ -198,10 +145,11 @@ bool isEndCounter(MachineInstr &MI) {
   ss << MI << "\n";
 
   if (tmp_str.size() != 58) {
-      return false;
+    return false;
   }
-  std::string token = tmp_str.substr(13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
-   if (token.find("ZRAY_COUNTER_END") != std::string::npos) {
+  std::string token = tmp_str.substr(
+      13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
+  if (token.find("ZRAY_COUNTER_END") != std::string::npos) {
     return true;
   }
 
@@ -209,37 +157,7 @@ bool isEndCounter(MachineInstr &MI) {
 }
 
 bool isCounter(MachineInstr &MI) {
-	return isBeginCounter(MI) || isEndCounter(MI);
-#if 0
-  std::string tmp_str;
-  raw_string_ostream ss(tmp_str);
-  ss << MI << "\n";
-
-  // tmp_str = reduce(tmp_str, " ", " \t");
-  // std::string split = " ";
-  // outs() << tmp_str << "\n";
-  // outs() << tmp_str.find(split) << "\n";
-  // size_t start = (tmp_str.find(split)) + 1;
-  // size_t end = tmp_str.find(split, start);
-  // std::string token = tmp_str.substr(0, tmp_str.find(split));
-
-  // Use hardcodings based on current MIR InlineASM format
-  // INLINEASM &"#ZRAY_COUNTER_START" ...
-  // outs() << tmp_str << "\n";
-  // outs() << start << split << end << split << token << "\n";
-
-  if (tmp_str.size() != 60) {
-      return false;
-  }
-  std::string token = tmp_str.substr(13 /* Start idx - first 13 chars are 'INLINEASM &"#' */, 18 /* length */);
-  // if (tmp_str.find("ZRAY_COUNTER_END") != std::string::npos) {
-  if (token.find("ZRAY_COUNTER_START") != std::string::npos) {
-    // outs() << "Found a counter" << "\n";
-    return true;
-  }
-
-  return false;
-#endif
+  return isBeginCounter(MI) || isEndCounter(MI);
 }
 
 bool bbHasCounter(MachineInstr &MI) {
@@ -247,19 +165,13 @@ bool bbHasCounter(MachineInstr &MI) {
   raw_string_ostream ss(tmp_str);
   ss << MI << "\n";
 
-  // tmp_str = reduce(tmp_str, " ", " \t");
-  // std::string split = " ";
-  // size_t start = (tmp_str.find(split)) + 1;
-  // size_t end = tmp_str.find(split, start);
-
   // Use hardcodings based on current MIR InlineASM format
   // INLINEASM &"#BB_HAS_ZRAY_COUNTER" ...
   if (tmp_str.size() != 61) {
-      return false;
+    return false;
   }
   std::string token = tmp_str.substr(13 /* Starting index */, 19 /* length */);
   if (token.find("BB_HAS_ZRAY_COUNTER") != std::string::npos) {
-    // outs() << "Found end marker" << "\n";
     return true;
   }
 
@@ -273,7 +185,6 @@ bool isToolPassBegin(MachineInstr &MI) {
 
   std::string token = tmp_str.substr(13 /* Starting index*/, 15 /* length */);
   if (token.find("TOOL_PASS_BEGIN") != std::string::npos) {
-    // outs() << "Found begin marker" << "\n";
     return true;
   }
 
@@ -344,8 +255,7 @@ bool readLogFile(std::string file) {
     std::string FunctionName(FunctionNameLen, '\0');
     regionLogFile.read(&FunctionName[0], FunctionNameLen);
 
-    if(!inProfile.EnableMIRPass)
-    {
+    if (!inProfile.EnableMIRPass) {
       regionLogFile.close();
       return false;
     }
@@ -391,60 +301,6 @@ void writeLogFile(std::string file) {
   }
   regionLogFile.close();
 }
-/*
-    bool isToolFlag(std::string inst, std::string pragmaName)
-    {
-        using namespace std;
-        bool flag = false;
-        inst = reduce(inst);
-        string split = " ";
-        string token = inst.substr(0, inst.find(split));
-
-        size_t state = 0;
-
-        size_t pos = 0;
-        while ((pos = inst.find(split)) != std::string::npos)
-        {
-            token = inst.substr(0, pos);
-            switch (state)
-            {
-            case 0:
-                if (token == "asm")
-                    state++;
-                break;
-            //case 1:
-            //    if (token == "sideeffect")
-            //        state++;
-            //    else
-            //        return false;
-            //    break;
-            case 1:
-                if (token.find(pragmaName) != string::npos)
-                    return true;
-                else
-                    return false;
-                break;
-            }
-
-            inst.erase(0, pos + split.length());
-        }
-        return false;
-    }
-
-    void parseBB(BasicBlock &MBB, std::vector<BBTag> &idVec) {
-        BBTag bbtag;
-        for (auto &MI : MBB) {
-            if (MI.isInlineAsm()) {
-                bbtag = getBBTag(MI);
-                if (bbtag.ceID != -1) {
-                    outs() << "CE ID is " << bbtag.ceID << "\n";
-                    outs() << MI << "\n";
-                    idVec.push_back(bbtag);
-                }
-            }
-        }
-    }
-    */
 
 // Global variable to store last BBTag, in case block is split
 BBTag lastbbtag;
@@ -458,10 +314,7 @@ void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
     if (MI.isInlineAsm()) {
       bbtag = getBBTag(MI);
       if (bbtag.ceID != -1) {
-#if 0
-        outs() << "CE ID is " << bbtag.ceID << "\n";
-        outs() << MI << "\n";
-#endif
+
         idVec.push_back(bbtag);
         lastbbtag = bbtag;
         recentBBFlag = 3;
@@ -469,96 +322,86 @@ void parseMBB(MachineBasicBlock &MBB, std::vector<BBTag> &idVec) {
       }
     }
   }
-  if((recentBBFlag > 0) && idVec.empty()) {
+  if ((recentBBFlag > 0) && idVec.empty()) {
     int inst_count = 0;
     // This will help us filter out blocks which may have resulted from a split
     --recentBBFlag;
     // Look for ending marker
-    for (MachineBasicBlock::reverse_iterator I = MBB.rbegin(); I != MBB.rend(); I++) {
-        if ((*I).isInlineAsm()) {
-            has_counter |= bbHasCounter(*I);
-        }
-        // Ugly hack to prevent spending too much time looking for ending
-        // marker, since it should be very close to the end, x86_64 has 68 registers
-        ++inst_count;
-        if(inst_count >= 20) {
-            break;
-        }
+    for (MachineBasicBlock::reverse_iterator I = MBB.rbegin(); I != MBB.rend();
+         I++) {
+      if ((*I).isInlineAsm()) {
+        has_counter |= bbHasCounter(*I);
+      }
+      // Ugly hack to prevent spending too much time looking for ending
+      // marker, since it should be very close to the end, x86_64 has 68
+      // registers
+      ++inst_count;
+      if (inst_count >= 20) {
+        break;
+      }
     }
-    if(has_counter) idVec.push_back(lastbbtag);
+    if (has_counter)
+      idVec.push_back(lastbbtag);
   }
 }
 
-bool isFloatMemAccess(MachineInstr &MI)
-{
-	const std::string floatIns[] = {"FLD", "FLW", "FSD", "FSW"} ;
-        if (MI.mayLoadOrStore()) {
-		std::string tmp_str;
-		raw_string_ostream ss(tmp_str);
-		ss << MI << "\n";
-		tmp_str = reduce(tmp_str, " ", " \t");
+bool isFloatMemAccess(MachineInstr &MI) {
+  const std::string floatIns[] = {"FLD", "FLW", "FSD", "FSW"};
+  if (MI.mayLoadOrStore()) {
+    std::string tmp_str;
+    raw_string_ostream ss(tmp_str);
+    ss << MI << "\n";
+    tmp_str = reduce(tmp_str, " ", " \t");
 
-		for(auto ins : floatIns)
-		{
-			if (tmp_str.find(ins) != std::string::npos)
-			{
-				return true;
-			}
-		}
-	}
-
-	return false;
-}
-
-unsigned int countSetBits(unsigned int n)
-{
-    unsigned int count = 0;
-    while (n) {
-        count += n & 1;
-        n >>= 1;
+    for (auto ins : floatIns) {
+      if (tmp_str.find(ins) != std::string::npos) {
+        return true;
+      }
     }
-    return count;
+  }
+
+  return false;
 }
 
-void detectSpill(MachineInstr &MI)
-{
-	std::string tmp_str;
-	raw_string_ostream ss(tmp_str);
-	ss << MI << "\n";
-	tmp_str = reduce(tmp_str, " ", " \t");
+unsigned int countSetBits(unsigned int n) {
+  unsigned int count = 0;
+  while (n) {
+    count += n & 1;
+    n >>= 1;
+  }
+  return count;
+}
 
-        if(MI.isCall()) {
-		outs() << "Found ra spill.\n";
-		RegisterMask |= 0x1;
-	}
-	else{
-		int i = 1;
-		for(auto reg : CalleeSavedRegisters)
-		{
-		    //if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("TimingProfile") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
-		    if (tmp_str.find(reg) != std::string::npos)
-		    {
-			outs() << "Found " << reg << " spill.\n";
-			    RegisterMask |= 1 << i;
-		    }
-			i++;
-		}
-	}
+void detectSpill(MachineInstr &MI) {
+  std::string tmp_str;
+  raw_string_ostream ss(tmp_str);
+  ss << MI << "\n";
+  tmp_str = reduce(tmp_str, " ", " \t");
+
+  if (MI.isCall()) {
+    outs() << "Found ra spill.\n";
+    RegisterMask |= 0x1;
+  } else {
+    int i = 1;
+    for (auto reg : CalleeSavedRegisters) {
+      if (tmp_str.find(reg) != std::string::npos) {
+        outs() << "Found " << reg << " spill.\n";
+        RegisterMask |= 1 << i;
+      }
+      i++;
+    }
+  }
 }
 
 char RISCVCustomPass::ID = 0;
-// uint64_t totalLoadCount = 0;
-// uint64_t totalStoreCount = 0;
 
 // TODO: Optimize how we update the log file so we are not reading/writing the
 // whole thing each time
 bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
-  //Guard to catch empty functions passed in
+  // Guard to catch empty functions passed in
   if (MF.empty()) {
     return false;
   }
-  // uint64_t functionLoadCount = 0;
-  // uint64_t functionStoreCount = 0;
 
   std::string logFileName = std::getenv("ZRAY_LOGFILE");
   // outs() << "In " << MF.getFunction().getName() << " Function\n";
@@ -566,13 +409,11 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
   // Read in CE profile count data
   if (pdVec.empty()) {
     // outs() << "Reading logfile\n";
-    if(!readLogFile(logFileName))
-    {
+    if (!readLogFile(logFileName)) {
       return false;
     }
 
-    if(FirstRun)
-    {
+    if (FirstRun) {
       outs() << "ZRAY: Running MIR Pass...\n";
       FirstRun = false;
     }
@@ -601,15 +442,6 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
 
     if (!bbTagVec.empty()) {
 
-#if 0
-                outs() << "Tags found. Updating counts...\n";
-                outs() << "Tags: ";
-                for(auto t : bbTagVec)
-                {
-                    outs() << t.ceID << " " << t.sf << "\n";
-                }
-                outs() << "\n";
-#endif
       size_t loads = 0;
       size_t float_loads = 0;
       size_t bytes_read = 0;
@@ -630,62 +462,57 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
           outs() << "Loop!\n";
           break;
         }
-	
-	detectSpill(MI);	
+
+        detectSpill(MI);
 
         init = true;
 
-        if(MI.isDebugInstr()) continue;
+        if (MI.isDebugInstr())
+          continue;
         // outs() << "MI: " << MI << "\n";
         ++total_insns;
 
-        if(MI.getOpcode() == TargetOpcode::G_INTRINSIC)
-        {
-            outs() << "G_INTRINSIC---------------------------\n";
-            outs() << MI << "\n";
-          if(MI.mayLoadOrStore())
-          {
+        if (MI.getOpcode() == TargetOpcode::G_INTRINSIC) {
+          outs() << "G_INTRINSIC---------------------------\n";
+          outs() << MI << "\n";
+          if (MI.mayLoadOrStore()) {
             for (auto mop : MI.memoperands()) {
-              if(mop->isStore()){
+              if (mop->isStore()) {
                 outs() << "INTRINSIC_OP_STORE\n";
               }
-              if(mop->isLoad()){
+              if (mop->isLoad()) {
                 outs() << "INTRINSIC_OP_LOAD\n";
               }
             }
           }
         }
-        if(!MI.mayLoadOrStore() && !MI.isCall() && !MI.isReturn() && !MI.isInlineAsm()) {
+        if (!MI.mayLoadOrStore() && !MI.isCall() && !MI.isReturn() &&
+            !MI.isInlineAsm()) {
           continue;
         }
 
-        if (MI.isInlineAsm())
-        {
+        if (MI.isInlineAsm()) {
           // outs() << MI << "\n";
-          if (isBeginCounter(MI))
-          {
+          if (isBeginCounter(MI)) {
             begin_counters++;
+          } else if (isEndCounter(MI)) {
+            end_counters++;
           }
-	  else if(isEndCounter(MI))
-	  {
-	    end_counters++;
-	  }
-          if (isToolPassBegin(MI))
-          {
-              bytes_read = 0;
-              loads = 0;
-              float_loads = 0;
-              bytes_written = 0;
-              stores = 0;
-              float_stores = 0;
-              counters = 0;
-              begin_counters = 0;
-              end_counters = 0;
+          if (isToolPassBegin(MI)) {
+            bytes_read = 0;
+            loads = 0;
+            float_loads = 0;
+            bytes_written = 0;
+            stores = 0;
+            float_stores = 0;
+            counters = 0;
+            begin_counters = 0;
+            end_counters = 0;
           }
           continue;
         }
 
-        //outs() << "MIR: bbTagVec Size: " << bbTagVec.size() << "\n";
+        // outs() << "MIR: bbTagVec Size: " << bbTagVec.size() << "\n";
         if (MI.mayLoadOrStore()) {
           for (auto mop : MI.memoperands()) {
             std::string tmp_str;
@@ -694,36 +521,41 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
             tmp_str = reduce(tmp_str, " ", " \t");
             // Check for CounterArray or CounterArrayRegionOffset in MI
             // If present, do not increment
-            // We still miss one extra load and store, so subtract those at the end
-            //if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos)) {
-            if ((tmp_str.find("RuntimeArray") != std::string::npos) || (tmp_str.find("CounterArray") != std::string::npos) || (tmp_str.find("TimingProfile") != std::string::npos) || (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
-                ++counter_insns;
-                continue;
+            // We still miss one extra load and store, so subtract those at the
+            // end
+            // if ((tmp_str.find("RuntimeArray") != std::string::npos) ||
+            // (tmp_str.find("CounterArray") != std::string::npos)) {
+            if ((tmp_str.find("RuntimeArray") != std::string::npos) ||
+                (tmp_str.find("CounterArray") != std::string::npos) ||
+                (tmp_str.find("TimingProfile") != std::string::npos) ||
+                (tmp_str.find("tool_dyn.cc") != std::string::npos)) {
+              ++counter_insns;
+              continue;
             }
-            if(mop->isStore()){
+            if (mop->isStore()) {
               // outs() << "Store MI: " << MI << "\n";
-              // outs() << "Store MI: " << MI << " size: " << mop->getSize() << "\n";
+              // outs() << "Store MI: " << MI << " size: " << mop->getSize() <<
+              // "\n";
               bytes_written += mop->getSize();
               stores++;
-	      if(isFloatMemAccess(MI))
-	      {
-		      float_stores++;
-	      }
+              if (isFloatMemAccess(MI)) {
+                float_stores++;
+              }
             }
-            if(mop->isLoad()){
+            if (mop->isLoad()) {
               // outs() << "Load MI: " << MI << "\n";
-              // outs() << "Load MI: " << MI << " size: " << mop->getSize() << "\n";
+              // outs() << "Load MI: " << MI << " size: " << mop->getSize() <<
+              // "\n";
               bytes_read += mop->getSize();
               loads++;
-	      if(isFloatMemAccess(MI))
-	      {
-		      float_loads++;
-	      }
+              if (isFloatMemAccess(MI)) {
+                float_loads++;
+              }
             }
           }
-        } 
+        }
 
-        #if 0
+#if 0
         // X86 pushes/pops the return address to/from stack on call/return
         if((MI.isCall() && (MI.getOpcode() != TargetOpcode::PATCHABLE_EVENT_CALL)) || (MI.getOpcode() == X86::PUSH64r)) {
           std::string tmp_str;
@@ -759,75 +591,73 @@ bool RISCVCustomPass::runOnMachineFunction(MachineFunction &MF) {
           bytes_read += 8;
           loads++;
         }
-        #endif
+#endif
         // if(bbTagVec.back().ceID == 4) {
         //   outs() << MI << "\n";
         //   outs() << "L: " << loads << " S: " << stores << "\n";
         // }
       }
-	
-	if (first_ce_id < 0)
-	{
-		first_ce_id = bbTagVec[0].ceID;
-	}
+
+      if (first_ce_id < 0) {
+        first_ce_id = bbTagVec[0].ceID;
+      }
 
       for (auto ID : bbTagVec) {
-	
-	      counters = std::max(begin_counters,end_counters);
-	if(begin_counters != end_counters)
-	{
-		pdVec[ID.ceID].SplitCounters++;
-	}
-	outs() << "V Parsing block V====================================\n";
-	outs() << MBB << "\n";
+
+        counters = std::max(begin_counters, end_counters);
+        if (begin_counters != end_counters) {
+          pdVec[ID.ceID].SplitCounters++;
+        }
+#if 0 // Print out MBB information
+        outs() << "V Parsing block V====================================\n";
+        outs() << MBB << "\n";
         outs() << "MIR: Store ID.sf: " << ID.ceID << " : " << ID.sf << "\n";
-        outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID << "\n";
-	outs() << "begin counters: " << begin_counters << ", end counters: " << end_counters << "\n";
-	outs() << "loads: " << loads << ", stores: " << stores << "\n";
-	outs() << "counters: " << counters << "\n";
-         outs() << "Observed loads: " << loads - counters << ", bytes read: " << bytes_read - 8*counters << ", stores: " << stores - counters << ", bytes written: " << bytes_written - 8*counters << ", counters: " << counters << "float load:store " << float_loads << ":" << float_stores << "\n";
-        // outs() << "Recorded loads " << (loads - 3 * counters)*ID.sf << "\n";
-        // outs() << "Recorded stores " << (stores - counters)*ID.sf << "\n";
-        // outs() << "Counters: " << counters << "\n";
+        outs() << "PostDomSetID is " << pdVec[ID.ceID].PostDomSetID
+               << " and PragmaRegionID is " << pdVec[ID.ceID].PragmaRegionID
+               << "\n";
+        outs() << "begin counters: " << begin_counters
+               << ", end counters: " << end_counters << "\n";
+        outs() << "loads: " << loads << ", stores: " << stores << "\n";
+        outs() << "counters: " << counters << "\n";
+        outs() << "Observed loads: " << loads - counters
+               << ", bytes read: " << bytes_read - 8 * counters
+               << ", stores: " << stores - counters
+               << ", bytes written: " << bytes_written - 8 * counters
+               << ", counters: " << counters << "float load:store "
+               << float_loads << ":" << float_stores << "\n";
+#endif
+
         if (counters <= loads) {
-            pdVec[ID.ceID].LoadCount += (loads - counters)*ID.sf;
-            pdVec[ID.ceID].FloatLoadCount += (float_loads)*ID.sf;
-            bytes_read -= 8 * counters;
-            pdVec[ID.ceID].MemInstructionCount += (loads - counters)*ID.sf;
+          pdVec[ID.ceID].LoadCount += (loads - counters) * ID.sf;
+          pdVec[ID.ceID].FloatLoadCount += (float_loads)*ID.sf;
+          bytes_read -= 8 * counters;
+          pdVec[ID.ceID].MemInstructionCount += (loads - counters) * ID.sf;
         }
         if (counters <= stores) {
-            pdVec[ID.ceID].StoreCount += (stores - counters)*ID.sf;
-            pdVec[ID.ceID].FloatStoreCount += (float_stores)*ID.sf;
-            bytes_written -= 8 * counters;
-            pdVec[ID.ceID].MemInstructionCount += (stores - counters)*ID.sf;
+          pdVec[ID.ceID].StoreCount += (stores - counters) * ID.sf;
+          pdVec[ID.ceID].FloatStoreCount += (float_stores)*ID.sf;
+          bytes_written -= 8 * counters;
+          pdVec[ID.ceID].MemInstructionCount += (stores - counters) * ID.sf;
         }
-	    // functionStoreCount += (stores - counters)*ID.sf;
-	    // functionLoadCount += (loads - 3 * counters)*ID.sf;
-	    // totalStoreCount += (stores - counters)*ID.sf;
-	    // totalLoadCount += (loads - 3 * counters)*ID.sf;
-        // outs() << "MIR: " << "ID " << ID.ceID << " StoreCount after: " << pdVec[ID.ceID].StoreCount << "\n";
-        // outs() << "MIR: " << "ID " << ID.ceID << " LoadCount after: " << pdVec[ID.ceID].LoadCount << "\n";
-        pdVec[ID.ceID].CounterInstCount += counter_insns + (4 * counters); // ADD, ADDI, LD, SD
-        pdVec[ID.ceID].TotalInstCount += total_insns - (4 * counters); // Do not include inline ASM statements like ZRAY_COUNTER_*, BB_TAG *, BB_HAS_ZRAY_COUNTER
-        pdVec[ID.ceID].BytesWritten += (bytes_written)*(ID.sf);
-        pdVec[ID.ceID].BytesRead += (bytes_read)*(ID.sf);
+
+        pdVec[ID.ceID].CounterInstCount +=
+            counter_insns + (4 * counters); // ADD, ADDI, LD, SD
+        pdVec[ID.ceID].TotalInstCount +=
+            total_insns -
+            (4 * counters); // Do not include inline ASM statements like
+                            // ZRAY_COUNTER_*, BB_TAG *, BB_HAS_ZRAY_COUNTER
+        pdVec[ID.ceID].BytesWritten += (bytes_written) * (ID.sf);
+        pdVec[ID.ceID].BytesRead += (bytes_read) * (ID.sf);
       }
     }
   }
 
-	if(first_ce_id >=0 && pdVec[first_ce_id].IsIndirect)
-	{
-		unsigned int spills = countSetBits(RegisterMask);
-		outs() << "^^^Total Spill count^^^ : " << spills << "\n";
-		pdVec[first_ce_id].LoadCount += spills;
-		pdVec[first_ce_id].StoreCount += spills;
-	}
-  // outs() << "Function: " << MF.getName().str() << "\n";
-  // outs() << "Loads      : " << functionLoadCount << "\n";
-  // outs() << "Stores     : " << functionStoreCount << "\n";
-  // outs() << "Total:\n";
-  // outs() << "Loads      : " << totalLoadCount << "\n";
-  // outs() << "Stores     : " << totalStoreCount << "\n";
+  if (first_ce_id >= 0 && pdVec[first_ce_id].IsIndirect) {
+    unsigned int spills = countSetBits(RegisterMask);
+    outs() << "^^^Total Spill count^^^ : " << spills << "\n";
+    pdVec[first_ce_id].LoadCount += spills;
+    pdVec[first_ce_id].StoreCount += spills;
+  }
 
   writeLogFile(logFileName);
   return false;
@@ -838,7 +668,8 @@ public:
   static char ID;
 
   RISCVCustomPassStaticMixCheck() : MachineFunctionPass(ID) {
-    initializeRISCVCustomPassStaticMixCheckPass(*PassRegistry::getPassRegistry());
+    initializeRISCVCustomPassStaticMixCheckPass(
+        *PassRegistry::getPassRegistry());
   }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
@@ -851,29 +682,28 @@ public:
 
 char RISCVCustomPassStaticMixCheck::ID = 0;
 
-void RISCVCustomPassStaticMixCheck::getAnalysisUsage(AnalysisUsage &AU) const
-{
-    MachineFunctionPass::getAnalysisUsage(AU);
+void RISCVCustomPassStaticMixCheck::getAnalysisUsage(AnalysisUsage &AU) const {
+  MachineFunctionPass::getAnalysisUsage(AU);
 }
 
 ProfileData StaticMixAppInfo;
 size_t BasicBlockCountApp = 0;
 
-void writeStaticMixInfo(MachineFunction &MF, const ProfileData &Prof, size_t BBCount)
-{
-    std::ofstream LogFile;
-    LogFile.open("./StaticMixInfo.log", std::ios::out | std::ios::app);
+void writeStaticMixInfo(MachineFunction &MF, const ProfileData &Prof,
+                        size_t BBCount) {
+  std::ofstream LogFile;
+  LogFile.open("./StaticMixInfo.log", std::ios::out | std::ios::app);
 
-    LogFile << "Function: " << MF.getName().str() << "\n";
-    LogFile << "Loads      : " << Prof.LoadCount << "\n";
-    LogFile << "Stores     : " << Prof.StoreCount << "\n";
-    LogFile << "BasicBlocks: " << BBCount << "\n";
-    LogFile << "Total\n";
-    LogFile << "Loads      : " << StaticMixAppInfo.LoadCount << "\n";
-    LogFile << "Stores     : " << StaticMixAppInfo.StoreCount << "\n";
-    LogFile << "BasicBlocks: " << BasicBlockCountApp << "\n";
+  LogFile << "Function: " << MF.getName().str() << "\n";
+  LogFile << "Loads      : " << Prof.LoadCount << "\n";
+  LogFile << "Stores     : " << Prof.StoreCount << "\n";
+  LogFile << "BasicBlocks: " << BBCount << "\n";
+  LogFile << "Total\n";
+  LogFile << "Loads      : " << StaticMixAppInfo.LoadCount << "\n";
+  LogFile << "Stores     : " << StaticMixAppInfo.StoreCount << "\n";
+  LogFile << "BasicBlocks: " << BasicBlockCountApp << "\n";
 
-    LogFile.close();
+  LogFile.close();
 }
 
 bool RISCVCustomPassStaticMixCheck::runOnMachineFunction(MachineFunction &MF) {
@@ -883,18 +713,17 @@ bool RISCVCustomPassStaticMixCheck::runOnMachineFunction(MachineFunction &MF) {
   for (auto &MBB : MF) {
     for (auto &MI : MBB) {
 
-        if (MI.isInlineAsm())
-        {
-          continue;
-        }
-        if (MI.mayLoad()) {
-          StaticMixAppInfo.LoadCount+=1;
-          StaticMixFuncInfo.LoadCount+=1;
-        }
-        if (MI.mayStore()) {
-          StaticMixAppInfo.StoreCount+=1;
-          StaticMixFuncInfo.StoreCount+=1;
-        }
+      if (MI.isInlineAsm()) {
+        continue;
+      }
+      if (MI.mayLoad()) {
+        StaticMixAppInfo.LoadCount += 1;
+        StaticMixFuncInfo.LoadCount += 1;
+      }
+      if (MI.mayStore()) {
+        StaticMixAppInfo.StoreCount += 1;
+        StaticMixFuncInfo.StoreCount += 1;
+      }
     }
     BasicBlockCountFunc++;
     BasicBlockCountApp++;
@@ -910,11 +739,14 @@ bool RISCVCustomPassStaticMixCheck::runOnMachineFunction(MachineFunction &MF) {
 INITIALIZE_PASS(RISCVCustomPass, "RISCV-custompass",
                 RISCV_MACHINEINSTR_CUSTOM_PASS_NAME, true, true)
 
-INITIALIZE_PASS(RISCVCustomPassStaticMixCheck, "RISCV-custompass-staticmixcheck",
+INITIALIZE_PASS(RISCVCustomPassStaticMixCheck,
+                "RISCV-custompass-staticmixcheck",
                 RISCV_MACHINEINSTR_CUSTOM_PASS_STATICMIXCHECK_NAME, true, true)
 
 namespace llvm {
 FunctionPass *createRISCVCustomPass() { return new RISCVCustomPass(); }
-FunctionPass *createRISCVCustomPassStaticMixCheck() { return new RISCVCustomPassStaticMixCheck(); }
+FunctionPass *createRISCVCustomPassStaticMixCheck() {
+  return new RISCVCustomPassStaticMixCheck();
+}
 } // namespace llvm
 #endif
