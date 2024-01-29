@@ -35,7 +35,9 @@ struct ProfileData {
   uint64_t PragmaRegionID = 0;
   uint64_t GroupNumber = 0;
   uint64_t StoreCount = 0;
+  uint64_t FloatStoreCount = 0;
   uint64_t LoadCount = 0;
+  uint64_t FloatLoadCount = 0;
   uint64_t BytesRead = 0;
   uint64_t BytesWritten = 0;
   uint64_t IntInstructionCount = 0;
@@ -54,6 +56,7 @@ struct ProfileData {
   uint64_t IntrinsicStore = 0;
   uint64_t TotalInstCount = 0;
   uint64_t CounterInstCount = 0;
+  uint64_t SplitCounters = 0;
   bool IsIndirect;
   bool EnableMIRPass;
 };
